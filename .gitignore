@@ -1,0 +1,32 @@
+# Locust runtime and state
+target/
+.state/
+.task/
+
+# Temporary run workspaces
+hello-world/
+tmp/
+temp/
+
+# Logs and process files
+*.log
+*.tmp
+*.temp
+nohup.out
+
+# Node dependencies and logs
+node_modules/
+npm-debug.log*
+
+# Editor and OS temp files
+*~
+*.swp
+*.swo
+*.bak
+.DS_Store
+Thumbs.db
+iot-sensors/
+
+# Locust per-project state: logs, run exports
+.locust/
+.idea/
