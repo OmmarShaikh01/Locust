@@ -8,7 +8,7 @@ const MAX_RECENT_LOGS: usize = 12;
 /// Maximum number of lines kept in the cross-agent activity tracer (Dashboard Frame 2).
 const MAX_ACTIVITY_LOG: usize = 200;
 /// Fixed top-level tabs: Dashboard, ACP Servers, Swarm.
-const TOP_LEVEL_TABS: usize = 3;
+const TOP_LEVEL_TABS: usize = 4;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AcpStatus {
@@ -1577,10 +1577,13 @@ mod tests {
         assert_eq!(model.selected_tab, 2);
 
         model.next_tab();
+        assert_eq!(model.selected_tab, 3);
+
+        model.next_tab();
         assert_eq!(model.selected_tab, 0);
 
         model.prev_tab();
-        assert_eq!(model.selected_tab, 2);
+        assert_eq!(model.selected_tab, 3);
     }
 
     #[test]
