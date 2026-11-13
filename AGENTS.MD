@@ -21,15 +21,16 @@
 - src/gui: GPUI desktop frontend implementing the 12-column Swiss typographic grid, Twitter/X theme palette, timeline streaming cards, composer, inspector, and approval modals.
 
 ## UI Navigation and Views
-- Tab 0: Dashboard (overview metrics cards, swarm agent matrix, activity tracer).
-- Tab 1: ACP Servers (server pool list, protocol capabilities, live command line, recent logs).
-- Tab 2: Swarm Cockpit (timeline transcript streaming, turn composer, limits inspector).
-- Interactive Navigation: Sidebar items, header tab pills, and keyboard shortcuts (`0`, `1`, `2`, `Tab`, `[`, `]`, `t`, `Esc`).
+- Tab 0: Dashboard (full-bleed 4-cell metrics banner, tabular swarm agent matrix, activity tracer).
+- Tab 1: ACP Servers (flush server pool list with 1px hairline divider rules, server specification sheet).
+- Tab 2: Swarm Cockpit (timeline transcript feed, flat composer bar, telemetry limits inspector).
+- Interactive Navigation: Left vertical sidebar serves as the single primary navigation spine. Duplicate top header tab pills are eliminated. Keyboard shortcuts (`0`, `1`, `2`, `Tab`, `[`, `]`, `t`, `Esc`) provide quick navigation.
 
 ## UI Typography and Layout Standard
 - Font: Enforces a single sans-serif typeface across all elements (`Segoe UI` on Windows, `Helvetica Neue` on macOS, `Arial` on Linux). Monospace and serif fonts are prohibited in the presentation layer.
 - Spacing System: 4px base Swiss Grid tokens (`spacing_unit: 4px`, `gap_xs: 4px`, `gap_sm: 8px`, `gap_md: 12px`, `gap_lg: 16px`, `gap_xl: 24px`, `padding_xs: 4px`, `padding_sm: 8px`, `padding_md: 12px`, `padding_lg: 16px`, `padding_xl: 24px`).
-- Border Radiuses: `radius_sm: 4px`, `radius_md: 8px`, `radius_lg: 12px`, `radius_xl: 16px`, `rounded_full`.
+- Border Radiuses: `radius_none: 0px` for panels, cards, and grid cells; `radius_xs: 2px` for buttons, badges, and inputs; `radius_sm: 4px`; `radius_md: 6px`; `radius_lg: 8px`; `radius_xl: 12px`. Floating bento boxes are prohibited.
+- Grid Philosophy: Full-bleed mathematical grid divided by 1px hairline borders (`border_b_1`, `border_r_1`, `border_t_1`, `border_l_1`), 2px solid accent left indicators on active items, and high-contrast uppercase tracked section headers.
 
 ## Test Suite Status
 - Unit tests: 99 tests passing offline.
