@@ -132,19 +132,21 @@ impl CockpitApp {
             .items_center()
             .justify_between()
             .w_full()
-            .h(px(48.0))
+            .h(px(52.0))
             .px(padding_lg())
             .bg(color_bg_base())
             .border_b_1()
             .border_color(color_border())
+            .font_family(font_family_sans())
             .child(
                 div()
                     .flex()
                     .flex_row()
                     .items_center()
-                    .gap(padding_md())
+                    .gap(gap_md())
                     .child(
                         div()
+                            .font_family(font_family_sans())
                             .text_size(font_size_header())
                             .font_weight(FontWeight::BOLD)
                             .text_color(color_text_primary())
@@ -152,6 +154,7 @@ impl CockpitApp {
                     )
                     .child(
                         div()
+                            .font_family(font_family_sans())
                             .text_size(font_size_caption())
                             .text_color(color_text_muted())
                             .child("// SWISS GRID COCKPIT"),
@@ -159,11 +162,12 @@ impl CockpitApp {
                     .child(
                         div()
                             .px(padding_sm())
-                            .py(px(2.0))
-                            .rounded(px(12.0))
+                            .py(padding_xs())
+                            .rounded(radius_md())
                             .bg(color_surface())
                             .border_1()
                             .border_color(color_border())
+                            .font_family(font_family_sans())
                             .text_size(font_size_caption())
                             .text_color(color_text_muted())
                             .child(format!("Project: {}", self.snapshot.project_path)),
@@ -174,15 +178,15 @@ impl CockpitApp {
                     .flex()
                     .flex_row()
                     .items_center()
-                    .gap(padding_md())
+                    .gap(gap_md())
                     .child(
                         div()
                             .flex()
                             .flex_row()
                             .items_center()
-                            .gap(padding_sm())
+                            .gap(gap_sm())
                             .px(padding_md())
-                            .py(px(3.0))
+                            .py(padding_xs())
                             .rounded_full()
                             .bg(color_surface())
                             .border_1()
@@ -196,6 +200,7 @@ impl CockpitApp {
                             )
                             .child(
                                 div()
+                                    .font_family(font_family_sans())
                                     .text_size(font_size_caption())
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .text_color(color_text_primary())
@@ -210,9 +215,9 @@ impl CockpitApp {
                             .flex()
                             .flex_row()
                             .items_center()
-                            .gap(px(6.0))
+                            .gap(gap_sm())
                             .px(padding_md())
-                            .py(px(3.0))
+                            .py(padding_xs())
                             .rounded_full()
                             .bg(color_surface())
                             .border_1()
@@ -226,6 +231,7 @@ impl CockpitApp {
                             )
                             .child(
                                 div()
+                                    .font_family(font_family_sans())
                                     .text_size(font_size_caption())
                                     .font_weight(FontWeight::BOLD)
                                     .text_color(color_text_primary())
@@ -243,24 +249,27 @@ impl CockpitApp {
         div()
             .flex()
             .flex_col()
-            .w(px(240.0))
+            .w(px(256.0))
             .h_full()
             .bg(color_bg_base())
             .border_r_1()
             .border_color(color_border())
             .p(padding_md())
-            .gap(padding_lg())
+            .gap(gap_lg())
+            .font_family(font_family_sans())
             .child(
                 div()
                     .flex()
                     .flex_col()
-                    .gap(px(4.0))
+                    .gap(gap_xs())
                     .child(
                         div()
+                            .font_family(font_family_sans())
                             .text_size(font_size_caption())
                             .font_weight(FontWeight::BOLD)
                             .text_color(color_text_muted())
                             .px(padding_sm())
+                            .py(padding_xs())
                             .child("NAVIGATION"),
                     )
                     .children(tabs.iter().enumerate().map(|(idx, title)| {
@@ -282,10 +291,11 @@ impl CockpitApp {
                             .items_center()
                             .px(padding_md())
                             .py(padding_sm())
-                            .rounded(px(8.0))
+                            .rounded(radius_md())
                             .bg(bg)
                             .hover(|s| s.bg(color_surface_hover()))
                             .cursor_pointer()
+                            .font_family(font_family_sans())
                             .text_size(font_size_body())
                             .font_weight(if is_active {
                                 FontWeight::BOLD
@@ -306,13 +316,15 @@ impl CockpitApp {
                 div()
                     .flex()
                     .flex_col()
-                    .gap(px(4.0))
+                    .gap(gap_xs())
                     .child(
                         div()
+                            .font_family(font_family_sans())
                             .text_size(font_size_caption())
                             .font_weight(FontWeight::BOLD)
                             .text_color(color_text_muted())
                             .px(padding_sm())
+                            .py(padding_xs())
                             .child("SWARM PANES"),
                     )
                     .children(
@@ -336,7 +348,7 @@ impl CockpitApp {
                                     .justify_between()
                                     .px(padding_md())
                                     .py(padding_sm())
-                                    .rounded(px(8.0))
+                                    .rounded(radius_md())
                                     .bg(bg)
                                     .hover(|s| s.bg(color_surface_hover()))
                                     .cursor_pointer()
@@ -353,7 +365,7 @@ impl CockpitApp {
                                             .flex()
                                             .flex_row()
                                             .items_center()
-                                            .gap(padding_sm())
+                                            .gap(gap_sm())
                                             .child(
                                                 div()
                                                     .w(px(8.0))
@@ -363,6 +375,7 @@ impl CockpitApp {
                                             )
                                             .child(
                                                 div()
+                                                    .font_family(font_family_sans())
                                                     .text_size(font_size_body())
                                                     .font_weight(if is_active {
                                                         FontWeight::SEMIBOLD
@@ -375,6 +388,7 @@ impl CockpitApp {
                                     )
                                     .child(
                                         div()
+                                            .font_family(font_family_sans())
                                             .text_size(font_size_caption())
                                             .text_color(color_text_muted())
                                             .child(pane.agent.clone()),
@@ -395,6 +409,7 @@ impl CockpitApp {
                 .items_center()
                 .justify_center()
                 .size_full()
+                .font_family(font_family_sans())
                 .text_color(color_text_muted())
                 .child("Select a pane to view transcript");
         };
@@ -407,6 +422,7 @@ impl CockpitApp {
             .flex_col()
             .size_full()
             .bg(color_bg_base())
+            .font_family(font_family_sans())
             .child(
                 div()
                     .flex()
@@ -421,7 +437,7 @@ impl CockpitApp {
                             .flex()
                             .flex_row()
                             .items_center()
-                            .gap(padding_md())
+                            .gap(gap_md())
                             .child(
                                 div()
                                     .flex()
@@ -433,6 +449,7 @@ impl CockpitApp {
                                     .bg(color_surface())
                                     .border_1()
                                     .border_color(color_border())
+                                    .font_family(font_family_sans())
                                     .text_size(font_size_body())
                                     .font_weight(FontWeight::BOLD)
                                     .text_color(color_accent_blue())
@@ -454,9 +471,10 @@ impl CockpitApp {
                                             .flex()
                                             .flex_row()
                                             .items_center()
-                                            .gap(padding_sm())
+                                            .gap(gap_sm())
                                             .child(
                                                 div()
+                                                    .font_family(font_family_sans())
                                                     .text_size(font_size_title())
                                                     .font_weight(FontWeight::BOLD)
                                                     .text_color(color_text_primary())
@@ -464,6 +482,7 @@ impl CockpitApp {
                                             )
                                             .child(
                                                 div()
+                                                    .font_family(font_family_sans())
                                                     .text_size(font_size_body())
                                                     .text_color(color_text_muted())
                                                     .child(format!("@{}", pane.agent)),
@@ -471,6 +490,7 @@ impl CockpitApp {
                                     )
                                     .child(
                                         div()
+                                            .font_family(font_family_sans())
                                             .text_size(font_size_caption())
                                             .text_color(color_text_muted())
                                             .child(format!("Model: {}", pane.model)),
@@ -482,11 +502,11 @@ impl CockpitApp {
                             .flex()
                             .flex_row()
                             .items_center()
-                            .gap(padding_sm())
+                            .gap(gap_sm())
                             .child(
                                 div()
                                     .px(padding_md())
-                                    .py(px(4.0))
+                                    .py(padding_xs())
                                     .rounded_full()
                                     .bg(if show_thinking {
                                         color_surface_hover()
@@ -496,6 +516,7 @@ impl CockpitApp {
                                     .border_1()
                                     .border_color(color_border())
                                     .cursor_pointer()
+                                    .font_family(font_family_sans())
                                     .text_size(font_size_caption())
                                     .font_weight(FontWeight::MEDIUM)
                                     .text_color(if show_thinking {
@@ -518,11 +539,12 @@ impl CockpitApp {
                             .child(
                                 div()
                                     .px(padding_md())
-                                    .py(px(4.0))
+                                    .py(padding_xs())
                                     .rounded_full()
                                     .bg(color_surface())
                                     .border_1()
                                     .border_color(status_badge_color)
+                                    .font_family(font_family_sans())
                                     .text_size(font_size_caption())
                                     .font_weight(FontWeight::BOLD)
                                     .text_color(status_badge_color)
@@ -536,19 +558,20 @@ impl CockpitApp {
                     .flex_col()
                     .flex_1()
                     .p(padding_lg())
-                    .gap(padding_lg())
+                    .gap(gap_lg())
                     .child(if show_thinking && !pane.thinking_lines.is_empty() {
                         div()
                             .flex()
                             .flex_col()
                             .p(padding_md())
-                            .rounded(px(8.0))
+                            .rounded(radius_md())
                             .bg(color_surface())
                             .border_1()
                             .border_color(color_border())
-                            .gap(px(2.0))
+                            .gap(gap_xs())
                             .child(
                                 div()
+                                    .font_family(font_family_sans())
                                     .text_size(font_size_caption())
                                     .font_weight(FontWeight::BOLD)
                                     .text_color(color_warning_amber())
@@ -556,6 +579,7 @@ impl CockpitApp {
                             )
                             .children(pane.thinking_lines.iter().map(|line| {
                                 div()
+                                    .font_family(font_family_sans())
                                     .text_size(font_size_body())
                                     .text_color(color_text_muted())
                                     .child(line.clone())
@@ -568,13 +592,14 @@ impl CockpitApp {
                             .flex()
                             .flex_col()
                             .p(padding_lg())
-                            .rounded(px(12.0))
+                            .rounded(radius_lg())
                             .bg(color_surface())
                             .border_1()
                             .border_color(color_border())
-                            .gap(px(4.0))
+                            .gap(gap_xs())
                             .children(if pane.output_lines.is_empty() {
                                 vec![div()
+                                    .font_family(font_family_sans())
                                     .text_size(font_size_body())
                                     .text_color(color_text_muted())
                                     .child("No output yet. Submit a directive to begin.")]
@@ -583,6 +608,7 @@ impl CockpitApp {
                                     .iter()
                                     .map(|line| {
                                         div()
+                                            .font_family(font_family_sans())
                                             .text_size(font_size_body())
                                             .text_color(color_text_primary())
                                             .child(line.clone())
@@ -604,21 +630,23 @@ impl CockpitApp {
             .bg(color_bg_base())
             .border_t_1()
             .border_color(color_border())
-            .gap(padding_sm())
+            .gap(gap_sm())
+            .font_family(font_family_sans())
             .child(
                 div()
                     .flex()
                     .flex_row()
                     .items_center()
                     .px(padding_md())
-                    .py(padding_sm())
-                    .rounded(px(20.0))
+                    .py(padding_xs())
+                    .rounded_full()
                     .bg(color_surface())
                     .border_1()
                     .border_color(color_border())
                     .child(
                         div()
                             .flex_1()
+                            .font_family(font_family_sans())
                             .text_size(font_size_body())
                             .text_color(if input_text.is_empty() {
                                 color_text_muted()
@@ -635,11 +663,12 @@ impl CockpitApp {
                     .child(
                         div()
                             .px(padding_lg())
-                            .py(px(6.0))
+                            .py(padding_sm())
                             .rounded_full()
                             .bg(color_accent_blue())
                             .hover(|s| s.opacity(0.85))
                             .cursor_pointer()
+                            .font_family(font_family_sans())
                             .text_size(font_size_body())
                             .font_weight(FontWeight::BOLD)
                             .text_color(color_text_primary())
@@ -668,19 +697,21 @@ impl CockpitApp {
             .border_l_1()
             .border_color(color_border())
             .p(padding_md())
-            .gap(padding_lg())
+            .gap(gap_lg())
+            .font_family(font_family_sans())
             .child(
                 div()
                     .flex()
                     .flex_col()
                     .p(padding_lg())
-                    .rounded(px(12.0))
+                    .rounded(radius_lg())
                     .bg(color_surface())
                     .border_1()
                     .border_color(color_border())
-                    .gap(padding_md())
+                    .gap(gap_md())
                     .child(
                         div()
+                            .font_family(font_family_sans())
                             .text_size(font_size_caption())
                             .font_weight(FontWeight::BOLD)
                             .text_color(color_text_muted())
@@ -693,12 +724,14 @@ impl CockpitApp {
                             .justify_between()
                             .child(
                                 div()
+                                    .font_family(font_family_sans())
                                     .text_size(font_size_body())
                                     .text_color(color_text_muted())
                                     .child("Total Tokens"),
                             )
                             .child(
                                 div()
+                                    .font_family(font_family_sans())
                                     .text_size(font_size_body())
                                     .font_weight(FontWeight::BOLD)
                                     .text_color(color_text_primary())
@@ -712,12 +745,14 @@ impl CockpitApp {
                             .justify_between()
                             .child(
                                 div()
+                                    .font_family(font_family_sans())
                                     .text_size(font_size_body())
                                     .text_color(color_text_muted())
                                     .child("Turn Cap"),
                             )
                             .child(
                                 div()
+                                    .font_family(font_family_sans())
                                     .text_size(font_size_body())
                                     .font_weight(FontWeight::BOLD)
                                     .text_color(color_text_primary())
@@ -731,12 +766,14 @@ impl CockpitApp {
                             .justify_between()
                             .child(
                                 div()
+                                    .font_family(font_family_sans())
                                     .text_size(font_size_body())
                                     .text_color(color_text_muted())
                                     .child("Estimated Cost"),
                             )
                             .child(
                                 div()
+                                    .font_family(font_family_sans())
                                     .text_size(font_size_body())
                                     .font_weight(FontWeight::BOLD)
                                     .text_color(color_success_green())
@@ -749,13 +786,14 @@ impl CockpitApp {
                     .flex()
                     .flex_col()
                     .p(padding_lg())
-                    .rounded(px(12.0))
+                    .rounded(radius_lg())
                     .bg(color_surface())
                     .border_1()
                     .border_color(color_border())
-                    .gap(padding_md())
+                    .gap(gap_md())
                     .child(
                         div()
+                            .font_family(font_family_sans())
                             .text_size(font_size_caption())
                             .font_weight(FontWeight::BOLD)
                             .text_color(color_text_muted())
@@ -763,6 +801,7 @@ impl CockpitApp {
                     )
                     .children(if self.snapshot.tasks.is_empty() {
                         vec![div()
+                            .font_family(font_family_sans())
                             .text_size(font_size_body())
                             .text_color(color_text_muted())
                             .child("No active handoff tasks.")]
@@ -776,11 +815,11 @@ impl CockpitApp {
                                     .flex()
                                     .flex_col()
                                     .p(padding_sm())
-                                    .rounded(px(8.0))
+                                    .rounded(radius_md())
                                     .bg(color_bg_base())
                                     .border_1()
                                     .border_color(color_border())
-                                    .gap(px(2.0))
+                                    .gap(gap_xs())
                                     .child(
                                         div()
                                             .flex()
@@ -789,6 +828,7 @@ impl CockpitApp {
                                             .justify_between()
                                             .child(
                                                 div()
+                                                    .font_family(font_family_sans())
                                                     .text_size(font_size_caption())
                                                     .font_weight(FontWeight::BOLD)
                                                     .text_color(color_text_primary())
@@ -799,6 +839,7 @@ impl CockpitApp {
                                             )
                                             .child(
                                                 div()
+                                                    .font_family(font_family_sans())
                                                     .text_size(font_size_caption())
                                                     .font_weight(FontWeight::BOLD)
                                                     .text_color(status_col)
@@ -807,6 +848,7 @@ impl CockpitApp {
                                     )
                                     .child(
                                         div()
+                                            .font_family(font_family_sans())
                                             .text_size(font_size_caption())
                                             .text_color(color_text_muted())
                                             .child(task.prompt.clone()),
@@ -832,17 +874,18 @@ impl CockpitApp {
             .items_center()
             .justify_center()
             .bg(rgba(0x000000aa))
+            .font_family(font_family_sans())
             .child(
                 div()
                     .flex()
                     .flex_col()
                     .w(px(480.0))
                     .p(padding_xl())
-                    .rounded(px(16.0))
+                    .rounded(radius_xl())
                     .bg(color_surface())
                     .border_1()
                     .border_color(color_warning_amber())
-                    .gap(padding_lg())
+                    .gap(gap_lg())
                     .child(
                         div()
                             .flex()
@@ -851,6 +894,7 @@ impl CockpitApp {
                             .justify_between()
                             .child(
                                 div()
+                                    .font_family(font_family_sans())
                                     .text_size(font_size_title())
                                     .font_weight(FontWeight::BOLD)
                                     .text_color(color_warning_amber())
@@ -858,6 +902,7 @@ impl CockpitApp {
                             )
                             .child(
                                 div()
+                                    .font_family(font_family_sans())
                                     .text_size(font_size_caption())
                                     .text_color(color_text_muted())
                                     .child(format!("Expires in {}s", perm.seconds_left)),
@@ -865,6 +910,7 @@ impl CockpitApp {
                     )
                     .child(
                         div()
+                            .font_family(font_family_sans())
                             .text_size(font_size_body())
                             .text_color(color_text_primary())
                             .child(format!(
@@ -875,10 +921,11 @@ impl CockpitApp {
                     .child(
                         div()
                             .p(padding_md())
-                            .rounded(px(8.0))
+                            .rounded(radius_md())
                             .bg(color_bg_base())
                             .border_1()
                             .border_color(color_border())
+                            .font_family(font_family_sans())
                             .text_size(font_size_caption())
                             .text_color(color_text_muted())
                             .child(perm.params.clone()),
@@ -888,7 +935,7 @@ impl CockpitApp {
                             .flex()
                             .flex_row()
                             .justify_end()
-                            .gap(padding_md())
+                            .gap(gap_md())
                             .child(
                                 div()
                                     .px(padding_lg())
@@ -898,6 +945,7 @@ impl CockpitApp {
                                     .border_1()
                                     .border_color(color_border())
                                     .cursor_pointer()
+                                    .font_family(font_family_sans())
                                     .text_size(font_size_body())
                                     .font_weight(FontWeight::BOLD)
                                     .text_color(color_danger_red())
@@ -919,6 +967,7 @@ impl CockpitApp {
                                     .rounded_full()
                                     .bg(color_accent_blue())
                                     .cursor_pointer()
+                                    .font_family(font_family_sans())
                                     .text_size(font_size_body())
                                     .font_weight(FontWeight::BOLD)
                                     .text_color(color_text_primary())
@@ -947,6 +996,7 @@ impl Render for CockpitApp {
             .flex_col()
             .size_full()
             .bg(color_bg_base())
+            .font_family(font_family_sans())
             .child(self.render_header(cx))
             .child(
                 div()
