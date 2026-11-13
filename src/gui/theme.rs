@@ -92,17 +92,23 @@ pub fn gap_xl() -> Pixels {
     px(24.0)
 }
 
+pub fn radius_none() -> Pixels {
+    px(0.0)
+}
+pub fn radius_xs() -> Pixels {
+    px(2.0)
+}
 pub fn radius_sm() -> Pixels {
     px(4.0)
 }
 pub fn radius_md() -> Pixels {
-    px(8.0)
+    px(6.0)
 }
 pub fn radius_lg() -> Pixels {
-    px(12.0)
+    px(8.0)
 }
 pub fn radius_xl() -> Pixels {
-    px(16.0)
+    px(12.0)
 }
 
 pub fn font_size_caption() -> Pixels {
