@@ -41,6 +41,16 @@ pub enum ClientCommand {
         limit: usize,
         min_level: Option<String>,
     },
+    RaiseRequest {
+        title: String,
+        target_agent: String,
+        description: String,
+    },
+    UpdateRequestState {
+        request_id: u64,
+        new_state: String,
+        review_note: Option<String>,
+    },
     Shutdown,
 }
 
@@ -123,6 +133,18 @@ pub struct TaskSnapshot {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct SwarmRequestSnapshot {
+    pub id: u64,
+    pub title: String,
+    pub target_agent: String,
+    pub description: String,
+    pub state: String, // "raised", "in_progress", "self_review", "human_review", "passed", "rejected"
+    pub created_at_secs: u64,
+    pub updated_at_secs: u64,
+    pub review_notes: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct PermissionSnapshot {
     pub request_id: String,
     pub agent_id: String,
@@ -143,6 +165,7 @@ pub struct ModelSnapshot {
     pub show_thinking: bool,
     pub controller_history: Vec<ControllerMessageSnapshot>,
     pub tasks: Vec<TaskSnapshot>,
+    pub requests: Vec<SwarmRequestSnapshot>,
     pub active_permission: Option<PermissionSnapshot>,
     pub activity_log: Vec<String>,
     pub total_tokens_used: u64,

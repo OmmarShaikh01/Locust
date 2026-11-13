@@ -34,6 +34,12 @@ pub fn color_danger_red() -> Rgba {
 pub fn color_warning_amber() -> Rgba {
     rgb(0xffd400)
 }
+pub fn color_review_purple() -> Rgba {
+    rgb(0xa855f7)
+}
+pub fn color_review_cyan() -> Rgba {
+    rgb(0x06b6d4)
+}
 
 /// Swiss Grid System Dimensions
 pub const GRID_COLUMNS: usize = 12;

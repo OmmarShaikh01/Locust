@@ -173,6 +173,68 @@ pub struct Task {
     pub status: TaskStatus,
 }
 
+/// Lifecycle state of a raised issue or feature request in the swarm issue tracker.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
+pub enum RequestState {
+    #[default]
+    Raised,
+    InProgress,
+    SelfReview,
+    HumanReview,
+    Passed,
+    Rejected,
+}
+
+impl RequestState {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            RequestState::Raised => "raised",
+            RequestState::InProgress => "in_progress",
+            RequestState::SelfReview => "self_review",
+            RequestState::HumanReview => "human_review",
+            RequestState::Passed => "passed",
+            RequestState::Rejected => "rejected",
+        }
+    }
+
+    /// Lenient parse that always succeeds (falls back to `Raised`), unlike `std::str::FromStr`.
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "in_progress" | "in progress" | "implementing" => RequestState::InProgress,
+            "self_review" | "self review" => RequestState::SelfReview,
+            "human_review" | "human review" => RequestState::HumanReview,
+            "passed" | "done" | "approved" => RequestState::Passed,
+            "rejected" | "changes_requested" => RequestState::Rejected,
+            _ => RequestState::Raised,
+        }
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            RequestState::Raised => "RAISED",
+            RequestState::InProgress => "IN PROGRESS",
+            RequestState::SelfReview => "SELF REVIEW",
+            RequestState::HumanReview => "HUMAN REVIEW",
+            RequestState::Passed => "PASSED",
+            RequestState::Rejected => "REJECTED",
+        }
+    }
+}
+
+/// A persistent swarm request or issue tracked from creation to verification and review.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct SwarmRequest {
+    pub id: u64,
+    pub title: String,
+    pub target_agent: String,
+    pub description: String,
+    pub state: RequestState,
+    pub created_at_secs: u64,
+    pub updated_at_secs: u64,
+    pub review_notes: Vec<String>,
+}
+
 /// What a pane's running turn is doing right now, from the agent's own streamed events.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TurnPhase {
@@ -435,6 +497,12 @@ pub struct Model {
     pub tasks: Vec<Task>,
     /// Monotonic id source for `tasks`, so every dispatched task gets a stable identity.
     next_task_id: u64,
+    /// Persistent swarm requests / issues in the kanban tracker.
+    pub requests: Vec<SwarmRequest>,
+    /// Monotonic id source for `requests`.
+    pub next_request_id: u64,
+    /// Where `requests` is saved so state survives restart and resumes per project.
+    request_store: Option<std::path::PathBuf>,
 }
 
 impl Default for Model {
@@ -493,6 +561,9 @@ impl Default for Model {
             auto_routed_turns: 0,
             tasks: Vec::new(),
             next_task_id: 1,
+            requests: Vec::new(),
+            next_request_id: 1,
+            request_store: None,
         }
     }
 }
@@ -572,6 +643,21 @@ impl Model {
             })
             .collect();
 
+        let requests = self
+            .requests
+            .iter()
+            .map(|r| SwarmRequestSnapshot {
+                id: r.id,
+                title: r.title.clone(),
+                target_agent: r.target_agent.clone(),
+                description: r.description.clone(),
+                state: r.state.as_str().to_string(),
+                created_at_secs: r.created_at_secs,
+                updated_at_secs: r.updated_at_secs,
+                review_notes: r.review_notes.clone(),
+            })
+            .collect();
+
         let active_permission = self.active_permission.as_ref().map(|p| PermissionSnapshot {
             request_id: p.id.to_string(),
             agent_id: p.agent_pane.clone(),
@@ -594,6 +680,7 @@ impl Model {
             show_thinking: self.show_thinking,
             controller_history,
             tasks,
+            requests,
             active_permission,
             activity_log: self.activity_log.clone(),
             total_tokens_used: self.telemetry.total_tokens,
@@ -671,6 +758,7 @@ mod directives;
 mod export;
 mod permissions;
 mod project_modal;
+mod requests;
 mod swarm_panes;
 
 /// Write a file only its owner can read. Transcripts can hold code and data that redaction
