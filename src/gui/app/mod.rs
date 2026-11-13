@@ -33,8 +33,14 @@ pub struct CockpitApp {
     kanban_col1_scroll_handle: ScrollHandle,
     kanban_col2_scroll_handle: ScrollHandle,
     kanban_col3_scroll_handle: ScrollHandle,
+    kanban_col4_scroll_handle: ScrollHandle,
     kanban_filter: usize,
     kanban_selected_item: Option<String>,
+    raise_modal_open: bool,
+    raise_title: String,
+    raise_target: String,
+    raise_desc: String,
+    raise_focus_field: usize,
 }
 
 impl CockpitApp {
@@ -60,8 +66,14 @@ impl CockpitApp {
             kanban_col1_scroll_handle: ScrollHandle::new(),
             kanban_col2_scroll_handle: ScrollHandle::new(),
             kanban_col3_scroll_handle: ScrollHandle::new(),
+            kanban_col4_scroll_handle: ScrollHandle::new(),
             kanban_filter: 0,
             kanban_selected_item: None,
+            raise_modal_open: false,
+            raise_title: String::new(),
+            raise_target: "Mission Orchestrator".to_string(),
+            raise_desc: String::new(),
+            raise_focus_field: 0,
         };
 
         cx.spawn(async move |entity, app| {
@@ -236,6 +248,8 @@ impl Render for CockpitApp {
             )
             .child(if let Some(perm) = &perm_opt {
                 self.render_permission_modal(perm, cx).into_any_element()
+            } else if self.raise_modal_open {
+                self.render_raise_modal(cx).into_any_element()
             } else {
                 div().into_any_element()
             })

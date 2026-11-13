@@ -34,6 +34,81 @@ impl CockpitApp {
             }
         }
 
+        // 1.5. Raise Request Modal Intercept
+        if this.raise_modal_open {
+            let key_name = event.keystroke.key.as_str();
+            match key_name {
+                "escape" => {
+                    this.raise_modal_open = false;
+                    cx.notify();
+                    return;
+                }
+                "tab" => {
+                    this.raise_focus_field = (this.raise_focus_field + 1) % 3;
+                    cx.notify();
+                    return;
+                }
+                "enter" => {
+                    if event.keystroke.modifiers.control || this.raise_focus_field == 2 {
+                        let title = this.raise_title.trim().to_string();
+                        if !title.is_empty() {
+                            let target_agent = if this.raise_target.trim().is_empty() {
+                                "Mission Orchestrator".to_string()
+                            } else {
+                                this.raise_target.trim().to_string()
+                            };
+                            let description = this.raise_desc.trim().to_string();
+                            this.send_command(ClientCommand::RaiseRequest {
+                                title,
+                                target_agent,
+                                description,
+                            });
+                            this.raise_title.clear();
+                            this.raise_desc.clear();
+                            this.raise_modal_open = false;
+                            cx.notify();
+                            return;
+                        }
+                    } else {
+                        this.raise_focus_field = (this.raise_focus_field + 1) % 3;
+                        cx.notify();
+                        return;
+                    }
+                }
+                "backspace" => {
+                    match this.raise_focus_field {
+                        0 => {
+                            this.raise_title.pop();
+                        }
+                        1 => {
+                            this.raise_target.pop();
+                        }
+                        _ => {
+                            this.raise_desc.pop();
+                        }
+                    }
+                    cx.notify();
+                    return;
+                }
+                _ => {
+                    if !event.keystroke.modifiers.control
+                        && !event.keystroke.modifiers.alt
+                        && !event.keystroke.modifiers.platform
+                        && let Some(s) = key_to_char(&event.keystroke)
+                    {
+                        match this.raise_focus_field {
+                            0 => this.raise_title.push_str(&s),
+                            1 => this.raise_target.push_str(&s),
+                            _ => this.raise_desc.push_str(&s),
+                        }
+                        cx.notify();
+                        return;
+                    }
+                }
+            }
+            return;
+        }
+
         let is_orch = this.is_orchestrator_pane(this.snapshot.swarm_selected_pane);
         let in_cockpit = this.snapshot.selected_tab == 2;
         let key_name = event.keystroke.key.as_str();
@@ -379,6 +454,7 @@ impl CockpitApp {
                         this.kanban_col1_scroll_handle.set_offset(off);
                         this.kanban_col2_scroll_handle.set_offset(off);
                         this.kanban_col3_scroll_handle.set_offset(off);
+                        this.kanban_col4_scroll_handle.set_offset(off);
                     }
                     _ => {
                         let mut off = this.timeline_scroll_handle.offset();
@@ -402,6 +478,7 @@ impl CockpitApp {
                         this.kanban_col1_scroll_handle.set_offset(off);
                         this.kanban_col2_scroll_handle.set_offset(off);
                         this.kanban_col3_scroll_handle.set_offset(off);
+                        this.kanban_col4_scroll_handle.set_offset(off);
                     }
                     _ => {
                         let mut off = this.timeline_scroll_handle.offset();
@@ -425,6 +502,7 @@ impl CockpitApp {
                         this.kanban_col1_scroll_handle.set_offset(off);
                         this.kanban_col2_scroll_handle.set_offset(off);
                         this.kanban_col3_scroll_handle.set_offset(off);
+                        this.kanban_col4_scroll_handle.set_offset(off);
                     }
                     _ => {
                         let mut off = this.timeline_scroll_handle.offset();
@@ -448,6 +526,7 @@ impl CockpitApp {
                         this.kanban_col1_scroll_handle.set_offset(off);
                         this.kanban_col2_scroll_handle.set_offset(off);
                         this.kanban_col3_scroll_handle.set_offset(off);
+                        this.kanban_col4_scroll_handle.set_offset(off);
                     }
                     _ => {
                         let mut off = this.timeline_scroll_handle.offset();
@@ -464,6 +543,7 @@ impl CockpitApp {
                 this.kanban_col1_scroll_handle.set_offset(Point::default());
                 this.kanban_col2_scroll_handle.set_offset(Point::default());
                 this.kanban_col3_scroll_handle.set_offset(Point::default());
+                this.kanban_col4_scroll_handle.set_offset(Point::default());
                 cx.notify();
             }
             "end" => {

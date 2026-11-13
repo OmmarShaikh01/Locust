@@ -97,6 +97,8 @@ impl DaemonServer {
             ));
         self.model
             .enable_message_store(std::path::PathBuf::from(".state").join("messages.json"));
+        self.model
+            .enable_request_store(self.project.root.join(".locust").join("issues.json"));
         self.model.begin_connect_all();
         self.manager.probe_all();
 
@@ -274,6 +276,24 @@ impl DaemonServer {
                     for entry in logging::recent_logs(limit, level) {
                         self.broadcast_event(ServerEvent::LogEmitted(entry));
                     }
+                }
+                ClientCommand::RaiseRequest {
+                    title,
+                    target_agent,
+                    description,
+                } => {
+                    self.model.raise_request(title, target_agent, description);
+                    self.broadcast_state_updated();
+                }
+                ClientCommand::UpdateRequestState {
+                    request_id,
+                    new_state,
+                    review_note,
+                } => {
+                    let state = crate::core::state::RequestState::from_str(&new_state);
+                    self.model
+                        .update_request_state(request_id, state, review_note);
+                    self.broadcast_state_updated();
                 }
                 ClientCommand::Shutdown => {
                     self.shutdown_requested = true;
