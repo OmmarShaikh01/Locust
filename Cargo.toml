@@ -1,13 +1,13 @@
 [package]
 name = "locust"
-version = "0.1.0"
+version = "0.0.2"
 edition = "2024"
 rust-version = "1.88"
-description = "Native Rust TUI cockpit for multi-agent swarms over the Agent Client Protocol"
+description = "Native Rust GPUI cockpit and daemon for multi-agent swarms over the Agent Client Protocol"
 license = "MIT"
 readme = "README.md"
-keywords = ["tui", "agents", "acp", "llm", "cli"]
-categories = ["command-line-utilities", "development-tools"]
+keywords = ["gpui", "agents", "acp", "llm", "cockpit"]
+categories = ["command-line-utilities", "development-tools", "gui"]
 default-run = "locust"
 
 [dependencies]
