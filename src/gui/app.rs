@@ -13,6 +13,9 @@ pub struct CockpitApp {
     connected: bool,
     composer_input: String,
     composer_focused: bool,
+    history: Vec<String>,
+    history_index: Option<usize>,
+    draft_input: String,
     cmd_tx: Option<Sender<ClientCommand>>,
     focus_handle: FocusHandle,
     timeline_scroll_handle: ScrollHandle,
@@ -31,6 +34,9 @@ impl CockpitApp {
             connected: false,
             composer_input: String::new(),
             composer_focused: true,
+            history: Vec::new(),
+            history_index: None,
+            draft_input: String::new(),
             cmd_tx: Some(cmd_tx),
             focus_handle: cx.focus_handle(),
             timeline_scroll_handle: ScrollHandle::new(),
@@ -53,6 +59,15 @@ impl CockpitApp {
                                 && this.is_orchestrator_pane(this.snapshot.swarm_selected_pane)
                             {
                                 this.composer_focused = true;
+                            }
+                            for msg in &this.snapshot.controller_history {
+                                if (msg.role == "operator" || msg.role == "user")
+                                    && !msg.text.trim().is_empty()
+                                {
+                                    if this.history.last().map(|s| s.as_str()) != Some(&msg.text) {
+                                        this.history.push(msg.text.clone());
+                                    }
+                                }
                             }
                             cx.notify();
                         }
@@ -1079,7 +1094,12 @@ impl CockpitApp {
                             cx.listener(move |this, _, window, cx| {
                                 let text = this.composer_input.trim().to_string();
                                 if !text.is_empty() {
-                                    this.send_command(ClientCommand::SubmitControllerTurn { text });
+                                    this.send_command(ClientCommand::SubmitControllerTurn { text: text.clone() });
+                                    if this.history.last().map(|s| s.as_str()) != Some(&text) {
+                                        this.history.push(text);
+                                    }
+                                    this.history_index = None;
+                                    this.draft_input.clear();
                                     this.composer_input.clear();
                                     this.composer_focused = true;
                                     window.focus(&this.focus_handle);
@@ -2283,7 +2303,12 @@ impl Render for CockpitApp {
                         "enter" => {
                             let text = this.composer_input.trim().to_string();
                             if !text.is_empty() {
-                                this.send_command(ClientCommand::SubmitControllerTurn { text });
+                                this.send_command(ClientCommand::SubmitControllerTurn { text: text.clone() });
+                                if this.history.last().map(|s| s.as_str()) != Some(&text) {
+                                    this.history.push(text);
+                                }
+                                this.history_index = None;
+                                this.draft_input.clear();
                                 this.composer_input.clear();
                                 this.composer_focused = true;
                                 cx.notify();
@@ -2293,6 +2318,41 @@ impl Render for CockpitApp {
                         "escape" => {
                             this.composer_focused = false;
                             cx.notify();
+                            return;
+                        }
+                        "up" => {
+                            if !this.history.is_empty() {
+                                match this.history_index {
+                                    None => {
+                                        this.draft_input = this.composer_input.clone();
+                                        let new_idx = this.history.len() - 1;
+                                        this.history_index = Some(new_idx);
+                                        this.composer_input = this.history[new_idx].clone();
+                                    }
+                                    Some(idx) => {
+                                        if idx > 0 {
+                                            let new_idx = idx - 1;
+                                            this.history_index = Some(new_idx);
+                                            this.composer_input = this.history[new_idx].clone();
+                                        }
+                                    }
+                                }
+                                cx.notify();
+                            }
+                            return;
+                        }
+                        "down" => {
+                            if let Some(idx) = this.history_index {
+                                if idx + 1 < this.history.len() {
+                                    let new_idx = idx + 1;
+                                    this.history_index = Some(new_idx);
+                                    this.composer_input = this.history[new_idx].clone();
+                                } else {
+                                    this.history_index = None;
+                                    this.composer_input = this.draft_input.clone();
+                                }
+                                cx.notify();
+                            }
                             return;
                         }
                         "backspace" => {
@@ -2394,6 +2454,20 @@ impl Render for CockpitApp {
                                 this.send_command(ClientCommand::SelectPane { pane_index: next });
                                 cx.notify();
                             }
+                            return;
+                        }
+                        "up" => {
+                            let mut off = this.timeline_scroll_handle.offset();
+                            off.y = (off.y + px(50.0)).min(px(0.0));
+                            this.timeline_scroll_handle.set_offset(off);
+                            cx.notify();
+                            return;
+                        }
+                        "down" => {
+                            let mut off = this.timeline_scroll_handle.offset();
+                            off.y -= px(50.0);
+                            this.timeline_scroll_handle.set_offset(off);
+                            cx.notify();
                             return;
                         }
                         "pageup" => {
@@ -2507,6 +2581,36 @@ impl Render for CockpitApp {
                             this.composer_focused = true;
                             cx.notify();
                         }
+                    }
+                    "up" => {
+                        match this.snapshot.selected_tab {
+                            0 => {
+                                let mut off = this.matrix_scroll_handle.offset();
+                                off.y = (off.y + px(50.0)).min(px(0.0));
+                                this.matrix_scroll_handle.set_offset(off);
+                            }
+                            _ => {
+                                let mut off = this.timeline_scroll_handle.offset();
+                                off.y = (off.y + px(50.0)).min(px(0.0));
+                                this.timeline_scroll_handle.set_offset(off);
+                            }
+                        }
+                        cx.notify();
+                    }
+                    "down" => {
+                        match this.snapshot.selected_tab {
+                            0 => {
+                                let mut off = this.matrix_scroll_handle.offset();
+                                off.y -= px(50.0);
+                                this.matrix_scroll_handle.set_offset(off);
+                            }
+                            _ => {
+                                let mut off = this.timeline_scroll_handle.offset();
+                                off.y -= px(50.0);
+                                this.timeline_scroll_handle.set_offset(off);
+                            }
+                        }
+                        cx.notify();
                     }
                     "pageup" => {
                         match this.snapshot.selected_tab {

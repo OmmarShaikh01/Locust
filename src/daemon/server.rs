@@ -292,7 +292,23 @@ impl DaemonServer {
             return;
         };
 
-        let Some(spec) = acp::spec_for_agent_id(acp::CONTROLLER_SPEC_ID) else {
+        let agent_from_roster = self
+            .model
+            .swarm_panes
+            .iter()
+            .find(|p| {
+                let lower = p.name.to_lowercase();
+                lower.contains("orchestrator") || lower.contains("controller")
+            })
+            .map(|p| p.assignment.agent.clone());
+
+        let spec = agent_from_roster
+            .as_deref()
+            .and_then(acp::spec_for_agent_id)
+            .or_else(|| acp::spec_for_agent_id(acp::CONTROLLER_SPEC_ID))
+            .or_else(|| acp::AGENT_SPECS.first());
+
+        let Some(spec) = spec else {
             self.model
                 .push_controller_reply(Err("no controller agent registered".to_string()));
             self.broadcast_state_updated();
