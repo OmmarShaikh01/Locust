@@ -20,6 +20,12 @@
 - src/daemon: Headless service maintaining persistent ACP agent subprocesses, turn capping, directive auto-routing, and multi-client IPC broadcast.
 - src/gui: GPUI desktop frontend implementing the 12-column Swiss typographic grid, Twitter/X theme palette, timeline streaming cards, composer, inspector, and approval modals.
 
+## UI Navigation and Views
+- Tab 0: Dashboard (overview metrics cards, swarm agent matrix, activity tracer).
+- Tab 1: ACP Servers (server pool list, protocol capabilities, live command line, recent logs).
+- Tab 2: Swarm Cockpit (timeline transcript streaming, turn composer, limits inspector).
+- Interactive Navigation: Sidebar items, header tab pills, and keyboard shortcuts (`0`, `1`, `2`, `Tab`, `[`, `]`, `t`, `Esc`).
+
 ## UI Typography and Layout Standard
 - Font: Enforces a single sans-serif typeface across all elements (`Segoe UI` on Windows, `Helvetica Neue` on macOS, `Arial` on Linux). Monospace and serif fonts are prohibited in the presentation layer.
 - Spacing System: 4px base Swiss Grid tokens (`spacing_unit: 4px`, `gap_xs: 4px`, `gap_sm: 8px`, `gap_md: 12px`, `gap_lg: 16px`, `gap_xl: 24px`, `padding_xs: 4px`, `padding_sm: 8px`, `padding_md: 12px`, `padding_lg: 16px`, `padding_xl: 24px`).

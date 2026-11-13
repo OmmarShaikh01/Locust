@@ -13,6 +13,7 @@ pub struct CockpitApp {
     connected: bool,
     composer_input: String,
     cmd_tx: Option<Sender<ClientCommand>>,
+    focus_handle: FocusHandle,
 }
 
 impl CockpitApp {
@@ -25,6 +26,7 @@ impl CockpitApp {
             connected: false,
             composer_input: String::new(),
             cmd_tx: Some(cmd_tx),
+            focus_handle: cx.focus_handle(),
         };
 
         cx.spawn(async move |entity, app| {
@@ -114,7 +116,7 @@ impl CockpitApp {
         }
     }
 
-    fn render_header(&self, _cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_header(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let conn_badge_color = if self.connected {
             color_success_green()
         } else {
@@ -125,6 +127,7 @@ impl CockpitApp {
         } else {
             "OFFLINE"
         };
+        let nav_tabs = ["0 Dashboard", "1 ACP Servers", "2 Swarm Cockpit"];
 
         div()
             .flex()
@@ -172,6 +175,52 @@ impl CockpitApp {
                             .text_color(color_text_muted())
                             .child(format!("Project: {}", self.snapshot.project_path)),
                     ),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .gap(gap_xs())
+                    .children(nav_tabs.iter().enumerate().map(|(idx, title)| {
+                        let is_active = idx == self.snapshot.selected_tab;
+                        div()
+                            .px(padding_md())
+                            .py(padding_xs())
+                            .rounded_full()
+                            .bg(if is_active {
+                                color_surface_hover()
+                            } else {
+                                color_surface()
+                            })
+                            .border_1()
+                            .border_color(if is_active {
+                                color_accent_blue()
+                            } else {
+                                color_border()
+                            })
+                            .cursor_pointer()
+                            .font_family(font_family_sans())
+                            .text_size(font_size_caption())
+                            .font_weight(if is_active {
+                                FontWeight::BOLD
+                            } else {
+                                FontWeight::MEDIUM
+                            })
+                            .text_color(if is_active {
+                                color_accent_blue()
+                            } else {
+                                color_text_primary()
+                            })
+                            .child(*title)
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(move |this, _, _, _| {
+                                    this.snapshot.selected_tab = idx;
+                                    this.send_command(ClientCommand::SwitchTab { tab_index: idx });
+                                }),
+                            )
+                    })),
             )
             .child(
                 div()
@@ -307,6 +356,7 @@ impl CockpitApp {
                             .on_mouse_down(
                                 MouseButton::Left,
                                 cx.listener(move |this, _, _, _| {
+                                    this.snapshot.selected_tab = idx;
                                     this.send_command(ClientCommand::SwitchTab { tab_index: idx });
                                 }),
                             )
@@ -355,6 +405,9 @@ impl CockpitApp {
                                     .on_mouse_down(
                                         MouseButton::Left,
                                         cx.listener(move |this, _, _, _| {
+                                            this.snapshot.selected_tab = 2;
+                                            this.snapshot.swarm_selected_pane = idx;
+                                            this.send_command(ClientCommand::SwitchTab { tab_index: 2 });
                                             this.send_command(ClientCommand::SelectPane {
                                                 pane_index: idx,
                                             });
@@ -985,11 +1038,688 @@ impl CockpitApp {
                     ),
             )
     }
+    fn render_swarm_cockpit(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        div()
+            .flex()
+            .flex_row()
+            .flex_1()
+            .size_full()
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .flex_1()
+                    .h_full()
+                    .child(self.render_timeline(cx))
+                    .child(self.render_composer(cx)),
+            )
+            .child(self.render_inspector(cx))
+    }
+
+    fn render_dashboard(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let panes = &self.snapshot.swarm_panes;
+        let mut idle_count = 0;
+        let mut running_count = 0;
+        let mut done_count = 0;
+        let mut error_count = 0;
+        for p in panes {
+            match p.status.to_uppercase().as_str() {
+                "ONLINE" | "DONE" => done_count += 1,
+                "RUNNING" | "THINKING" => running_count += 1,
+                "ERROR" | "FAILED" => error_count += 1,
+                _ => idle_count += 1,
+            }
+        }
+
+        div()
+            .flex()
+            .flex_col()
+            .flex_1()
+            .size_full()
+            .bg(color_bg_base())
+            .p(padding_lg())
+            .gap(gap_lg())
+            .font_family(font_family_sans())
+            .child(
+                div()
+                    .flex()
+                    .flex_row()
+                    .gap(gap_md())
+                    .w_full()
+                    .child(
+                        div()
+                            .flex_1()
+                            .p(padding_md())
+                            .rounded(radius_lg())
+                            .bg(color_surface())
+                            .border_1()
+                            .border_color(color_border())
+                            .gap(gap_xs())
+                            .child(
+                                div()
+                                    .font_family(font_family_sans())
+                                    .text_size(font_size_caption())
+                                    .font_weight(FontWeight::BOLD)
+                                    .text_color(color_text_muted())
+                                    .child("SWARM AGENTS"),
+                            )
+                            .child(
+                                div()
+                                    .font_family(font_family_sans())
+                                    .text_size(font_size_header())
+                                    .font_weight(FontWeight::BOLD)
+                                    .text_color(color_text_primary())
+                                    .child(format!("{} Total", panes.len())),
+                            )
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_row()
+                                    .gap(gap_sm())
+                                    .font_family(font_family_sans())
+                                    .text_size(font_size_caption())
+                                    .child(
+                                        div()
+                                            .text_color(color_success_green())
+                                            .child(format!("{done_count} done")),
+                                    )
+                                    .child(
+                                        div()
+                                            .text_color(color_warning_amber())
+                                            .child(format!("{running_count} running")),
+                                    )
+                                    .child(
+                                        div()
+                                            .text_color(color_danger_red())
+                                            .child(format!("{error_count} err")),
+                                    )
+                                    .child(
+                                        div()
+                                            .text_color(color_text_muted())
+                                            .child(format!("{idle_count} idle")),
+                                    ),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .flex_1()
+                            .p(padding_md())
+                            .rounded(radius_lg())
+                            .bg(color_surface())
+                            .border_1()
+                            .border_color(color_border())
+                            .gap(gap_xs())
+                            .child(
+                                div()
+                                    .font_family(font_family_sans())
+                                    .text_size(font_size_caption())
+                                    .font_weight(FontWeight::BOLD)
+                                    .text_color(color_text_muted())
+                                    .child("TOKEN USAGE"),
+                            )
+                            .child(
+                                div()
+                                    .font_family(font_family_sans())
+                                    .text_size(font_size_header())
+                                    .font_weight(FontWeight::BOLD)
+                                    .text_color(color_accent_blue())
+                                    .child(format!("{}", self.snapshot.total_tokens_used)),
+                            )
+                            .child(
+                                div()
+                                    .font_family(font_family_sans())
+                                    .text_size(font_size_caption())
+                                    .text_color(color_text_muted())
+                                    .child(format!("Turn Cap: {} max", self.snapshot.turn_cap)),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .flex_1()
+                            .p(padding_md())
+                            .rounded(radius_lg())
+                            .bg(color_surface())
+                            .border_1()
+                            .border_color(color_border())
+                            .gap(gap_xs())
+                            .child(
+                                div()
+                                    .font_family(font_family_sans())
+                                    .text_size(font_size_caption())
+                                    .font_weight(FontWeight::BOLD)
+                                    .text_color(color_text_muted())
+                                    .child("FINANCIAL TELEMETRY"),
+                            )
+                            .child(
+                                div()
+                                    .font_family(font_family_sans())
+                                    .text_size(font_size_header())
+                                    .font_weight(FontWeight::BOLD)
+                                    .text_color(color_success_green())
+                                    .child(format!("${:.4} USD", self.snapshot.total_cost_usd)),
+                            )
+                            .child(
+                                div()
+                                    .font_family(font_family_sans())
+                                    .text_size(font_size_caption())
+                                    .text_color(color_text_muted())
+                                    .child(format!("{} invocations", self.snapshot.total_invocations)),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .flex_1()
+                            .p(padding_md())
+                            .rounded(radius_lg())
+                            .bg(color_surface())
+                            .border_1()
+                            .border_color(color_border())
+                            .gap(gap_xs())
+                            .child(
+                                div()
+                                    .font_family(font_family_sans())
+                                    .text_size(font_size_caption())
+                                    .font_weight(FontWeight::BOLD)
+                                    .text_color(color_text_muted())
+                                    .child("ACP SERVERS"),
+                            )
+                            .child(
+                                div()
+                                    .font_family(font_family_sans())
+                                    .text_size(font_size_header())
+                                    .font_weight(FontWeight::BOLD)
+                                    .text_color(color_text_primary())
+                                    .child(format!("{} Configured", self.snapshot.acp_servers.len())),
+                            )
+                            .child(
+                                div()
+                                    .font_family(font_family_sans())
+                                    .text_size(font_size_caption())
+                                    .text_color(color_text_muted())
+                                    .child("Protocol v5.0.0"),
+                            ),
+                    ),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_row()
+                    .flex_1()
+                    .gap(gap_md())
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .flex_1()
+                            .p(padding_lg())
+                            .rounded(radius_lg())
+                            .bg(color_surface())
+                            .border_1()
+                            .border_color(color_border())
+                            .gap(gap_sm())
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_row()
+                                    .justify_between()
+                                    .child(
+                                        div()
+                                            .font_family(font_family_sans())
+                                            .text_size(font_size_title())
+                                            .font_weight(FontWeight::BOLD)
+                                            .text_color(color_text_primary())
+                                            .child("Swarm Agent Matrix"),
+                                    )
+                                    .child(
+                                        div()
+                                            .font_family(font_family_sans())
+                                            .text_size(font_size_caption())
+                                            .text_color(color_text_muted())
+                                            .child("Click pane to open cockpit"),
+                                    ),
+                            )
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap(gap_xs())
+                                    .children(panes.iter().enumerate().map(|(idx, p)| {
+                                        let status_col = status_color(&p.status);
+                                        div()
+                                            .flex()
+                                            .flex_row()
+                                            .items_center()
+                                            .justify_between()
+                                            .p(padding_sm())
+                                            .rounded(radius_md())
+                                            .bg(color_bg_base())
+                                            .border_1()
+                                            .border_color(color_border())
+                                            .hover(|s| s.bg(color_surface_hover()))
+                                            .cursor_pointer()
+                                            .on_mouse_down(
+                                                MouseButton::Left,
+                                                cx.listener(move |this, _, _, _| {
+                                                    this.snapshot.selected_tab = 2;
+                                                    this.snapshot.swarm_selected_pane = idx;
+                                                    this.send_command(ClientCommand::SwitchTab {
+                                                        tab_index: 2,
+                                                    });
+                                                    this.send_command(ClientCommand::SelectPane {
+                                                        pane_index: idx,
+                                                    });
+                                                }),
+                                            )
+                                            .child(
+                                                div()
+                                                    .flex()
+                                                    .flex_row()
+                                                    .items_center()
+                                                    .gap(gap_sm())
+                                                    .child(
+                                                        div()
+                                                            .w(px(8.0))
+                                                            .h(px(8.0))
+                                                            .rounded_full()
+                                                            .bg(status_col),
+                                                    )
+                                                    .child(
+                                                        div()
+                                                            .font_family(font_family_sans())
+                                                            .text_size(font_size_body())
+                                                            .font_weight(FontWeight::SEMIBOLD)
+                                                            .text_color(color_text_primary())
+                                                            .child(p.name.clone()),
+                                                    )
+                                                    .child(
+                                                        div()
+                                                            .font_family(font_family_sans())
+                                                            .text_size(font_size_caption())
+                                                            .text_color(color_text_muted())
+                                                            .child(format!("@{}", p.agent)),
+                                                    ),
+                                            )
+                                            .child(
+                                                div()
+                                                    .flex()
+                                                    .flex_row()
+                                                    .items_center()
+                                                    .gap(gap_md())
+                                                    .child(
+                                                        div()
+                                                            .font_family(font_family_sans())
+                                                            .text_size(font_size_caption())
+                                                            .text_color(color_text_muted())
+                                                            .child(format!("{} turns", p.turns_used)),
+                                                    )
+                                                    .child(
+                                                        div()
+                                                            .px(padding_sm())
+                                                            .py(padding_xs())
+                                                            .rounded_full()
+                                                            .bg(color_surface())
+                                                            .font_family(font_family_sans())
+                                                            .text_size(font_size_caption())
+                                                            .font_weight(FontWeight::BOLD)
+                                                            .text_color(status_col)
+                                                            .child(p.status.clone()),
+                                                    ),
+                                            )
+                                    })),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .flex_1()
+                            .p(padding_lg())
+                            .rounded(radius_lg())
+                            .bg(color_surface())
+                            .border_1()
+                            .border_color(color_border())
+                            .gap(gap_sm())
+                            .child(
+                                div()
+                                    .font_family(font_family_sans())
+                                    .text_size(font_size_title())
+                                    .font_weight(FontWeight::BOLD)
+                                    .text_color(color_text_primary())
+                                    .child(format!(
+                                        "Activity Tracer ({} events)",
+                                        self.snapshot.activity_log.len()
+                                    )),
+                            )
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap(gap_xs())
+                                    .children(if self.snapshot.activity_log.is_empty() {
+                                        vec![div()
+                                            .font_family(font_family_sans())
+                                            .text_size(font_size_body())
+                                            .text_color(color_text_muted())
+                                            .child("No activity recorded yet. Swarm is idle.")]
+                                    } else {
+                                        self.snapshot
+                                            .activity_log
+                                            .iter()
+                                            .map(|entry| {
+                                                div()
+                                                    .p(padding_xs())
+                                                    .font_family(font_family_sans())
+                                                    .text_size(font_size_caption())
+                                                    .text_color(if entry.contains("ERROR")
+                                                        || entry.contains("failed")
+                                                    {
+                                                        color_danger_red()
+                                                    } else if entry.contains("done")
+                                                        || entry.contains("approved")
+                                                    {
+                                                        color_success_green()
+                                                    } else {
+                                                        color_text_muted()
+                                                    })
+                                                    .child(entry.clone())
+                                            })
+                                            .collect()
+                                    }),
+                            ),
+                    ),
+            )
+    }
+
+    fn render_acp_servers(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let servers = &self.snapshot.acp_servers;
+        let selected_idx = self.snapshot.acp_selected_server;
+        let selected_server = servers.get(selected_idx);
+
+        div()
+            .flex()
+            .flex_row()
+            .flex_1()
+            .size_full()
+            .bg(color_bg_base())
+            .p(padding_lg())
+            .gap(gap_lg())
+            .font_family(font_family_sans())
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .w(px(380.0))
+                    .p(padding_lg())
+                    .rounded(radius_lg())
+                    .bg(color_surface())
+                    .border_1()
+                    .border_color(color_border())
+                    .gap(gap_md())
+                    .child(
+                        div()
+                            .font_family(font_family_sans())
+                            .text_size(font_size_title())
+                            .font_weight(FontWeight::BOLD)
+                            .text_color(color_text_primary())
+                            .child(format!("ACP Servers ({})", servers.len())),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap(gap_xs())
+                            .children(servers.iter().enumerate().map(|(idx, s)| {
+                                let is_active = idx == selected_idx;
+                                let status_col = status_color(&s.status);
+                                div()
+                                    .flex()
+                                    .flex_row()
+                                    .items_center()
+                                    .justify_between()
+                                    .p(padding_md())
+                                    .rounded(radius_md())
+                                    .bg(if is_active {
+                                        color_surface_hover()
+                                    } else {
+                                        color_bg_base()
+                                    })
+                                    .border_1()
+                                    .border_color(if is_active {
+                                        color_accent_blue()
+                                    } else {
+                                        color_border()
+                                    })
+                                    .cursor_pointer()
+                                    .on_mouse_down(
+                                        MouseButton::Left,
+                                        cx.listener(move |this, _, _, _| {
+                                            this.snapshot.acp_selected_server = idx;
+                                            this.send_command(ClientCommand::SelectAcpServer {
+                                                server_index: idx,
+                                            });
+                                        }),
+                                    )
+                                    .child(
+                                        div()
+                                            .flex()
+                                            .flex_col()
+                                            .child(
+                                                div()
+                                                    .font_family(font_family_sans())
+                                                    .text_size(font_size_body())
+                                                    .font_weight(FontWeight::BOLD)
+                                                    .text_color(color_text_primary())
+                                                    .child(s.name.clone()),
+                                            )
+                                            .child(
+                                                div()
+                                                    .font_family(font_family_sans())
+                                                    .text_size(font_size_caption())
+                                                    .text_color(color_text_muted())
+                                                    .child(s.id.clone()),
+                                            ),
+                                    )
+                                    .child(
+                                        div()
+                                            .px(padding_sm())
+                                            .py(padding_xs())
+                                            .rounded_full()
+                                            .bg(color_surface())
+                                            .font_family(font_family_sans())
+                                            .text_size(font_size_caption())
+                                            .font_weight(FontWeight::BOLD)
+                                            .text_color(status_col)
+                                            .child(s.status.clone()),
+                                    )
+                            })),
+                    ),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .flex_1()
+                    .p(padding_lg())
+                    .rounded(radius_lg())
+                    .bg(color_surface())
+                    .border_1()
+                    .border_color(color_border())
+                    .gap(gap_md())
+                    .child(if let Some(s) = selected_server {
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap(gap_md())
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_row()
+                                    .items_center()
+                                    .justify_between()
+                                    .child(
+                                        div()
+                                            .flex()
+                                            .flex_col()
+                                            .child(
+                                                div()
+                                                    .font_family(font_family_sans())
+                                                    .text_size(font_size_header())
+                                                    .font_weight(FontWeight::BOLD)
+                                                    .text_color(color_text_primary())
+                                                    .child(s.name.clone()),
+                                            )
+                                            .child(
+                                                div()
+                                                    .font_family(font_family_sans())
+                                                    .text_size(font_size_caption())
+                                                    .text_color(color_text_muted())
+                                                    .child(format!(
+                                                        "Transport: {} | Protocol: {}",
+                                                        s.transport, s.protocol
+                                                    )),
+                                            ),
+                                    )
+                                    .child(
+                                        div()
+                                            .font_family(font_family_sans())
+                                            .text_size(font_size_caption())
+                                            .text_color(color_text_muted())
+                                            .child(format!("Ping: {}ms", s.ping_ms)),
+                                    ),
+                            )
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap(gap_xs())
+                                    .child(
+                                        div()
+                                            .font_family(font_family_sans())
+                                            .text_size(font_size_caption())
+                                            .font_weight(FontWeight::BOLD)
+                                            .text_color(color_text_muted())
+                                            .child("COMMAND LINE"),
+                                    )
+                                    .child(
+                                        div()
+                                            .p(padding_md())
+                                            .rounded(radius_md())
+                                            .bg(color_bg_base())
+                                            .border_1()
+                                            .border_color(color_border())
+                                            .font_family(font_family_sans())
+                                            .text_size(font_size_body())
+                                            .text_color(color_accent_blue())
+                                            .child(if s.command_line.is_empty() {
+                                                "Internal In-Memory Agent".to_string()
+                                            } else {
+                                                s.command_line.clone()
+                                            }),
+                                    ),
+                            )
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap(gap_xs())
+                                    .child(
+                                        div()
+                                            .font_family(font_family_sans())
+                                            .text_size(font_size_caption())
+                                            .font_weight(FontWeight::BOLD)
+                                            .text_color(color_text_muted())
+                                            .child("CAPABILITIES"),
+                                    )
+                                    .child(
+                                        div()
+                                            .flex()
+                                            .flex_row()
+                                            .gap(gap_xs())
+                                            .children(if s.capabilities.is_empty() {
+                                                vec![div()
+                                                    .font_family(font_family_sans())
+                                                    .text_size(font_size_caption())
+                                                    .text_color(color_text_muted())
+                                                    .child("Default tool execution")]
+                                            } else {
+                                                s.capabilities
+                                                    .iter()
+                                                    .map(|c| {
+                                                        div()
+                                                            .px(padding_sm())
+                                                            .py(padding_xs())
+                                                            .rounded_full()
+                                                            .bg(color_bg_base())
+                                                            .border_1()
+                                                            .border_color(color_border())
+                                                            .font_family(font_family_sans())
+                                                            .text_size(font_size_caption())
+                                                            .text_color(color_text_primary())
+                                                            .child(c.clone())
+                                                    })
+                                                    .collect()
+                                            }),
+                                    ),
+                            )
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap(gap_xs())
+                                    .child(
+                                        div()
+                                            .font_family(font_family_sans())
+                                            .text_size(font_size_caption())
+                                            .font_weight(FontWeight::BOLD)
+                                            .text_color(color_text_muted())
+                                            .child("RECENT SERVER LOGS"),
+                                    )
+                                    .child(
+                                        div()
+                                            .p(padding_md())
+                                            .rounded(radius_md())
+                                            .bg(color_bg_base())
+                                            .border_1()
+                                            .border_color(color_border())
+                                            .children(if s.recent_logs.is_empty() {
+                                                vec![div()
+                                                    .font_family(font_family_sans())
+                                                    .text_size(font_size_caption())
+                                                    .text_color(color_text_muted())
+                                                    .child("No recent logs for this server.")]
+                                            } else {
+                                                s.recent_logs
+                                                    .iter()
+                                                    .map(|log| {
+                                                        div()
+                                                            .font_family(font_family_sans())
+                                                            .text_size(font_size_caption())
+                                                            .text_color(color_text_muted())
+                                                            .child(log.clone())
+                                                    })
+                                                    .collect()
+                                            }),
+                                    ),
+                            )
+                    } else {
+                        div()
+                            .font_family(font_family_sans())
+                            .text_size(font_size_body())
+                            .text_color(color_text_muted())
+                            .child("Select an ACP server to view configuration and status.")
+                    }),
+            )
+    }
 }
 
 impl Render for CockpitApp {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if !self.focus_handle.is_focused(window) {
+            window.focus(&self.focus_handle);
+        }
+
         let perm_opt = self.snapshot.active_permission.clone();
+        let selected_tab = self.snapshot.selected_tab;
 
         div()
             .flex()
@@ -997,6 +1727,60 @@ impl Render for CockpitApp {
             .size_full()
             .bg(color_bg_base())
             .font_family(font_family_sans())
+            .track_focus(&self.focus_handle)
+            .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
+                match event.keystroke.key.as_str() {
+                    "0" => {
+                        this.snapshot.selected_tab = 0;
+                        this.send_command(ClientCommand::SwitchTab { tab_index: 0 });
+                        cx.notify();
+                    }
+                    "1" => {
+                        this.snapshot.selected_tab = 1;
+                        this.send_command(ClientCommand::SwitchTab { tab_index: 1 });
+                        cx.notify();
+                    }
+                    "2" => {
+                        this.snapshot.selected_tab = 2;
+                        this.send_command(ClientCommand::SwitchTab { tab_index: 2 });
+                        cx.notify();
+                    }
+                    "tab" => {
+                        let next = (this.snapshot.selected_tab + 1) % 3;
+                        this.snapshot.selected_tab = next;
+                        this.send_command(ClientCommand::SwitchTab { tab_index: next });
+                        cx.notify();
+                    }
+                    "[" => {
+                        if !this.snapshot.swarm_panes.is_empty() {
+                            let curr = this.snapshot.swarm_selected_pane;
+                            let prev = if curr == 0 {
+                                this.snapshot.swarm_panes.len() - 1
+                            } else {
+                                curr - 1
+                            };
+                            this.snapshot.swarm_selected_pane = prev;
+                            this.send_command(ClientCommand::SelectPane { pane_index: prev });
+                            cx.notify();
+                        }
+                    }
+                    "]" => {
+                        if !this.snapshot.swarm_panes.is_empty() {
+                            let curr = this.snapshot.swarm_selected_pane;
+                            let next = (curr + 1) % this.snapshot.swarm_panes.len();
+                            this.snapshot.swarm_selected_pane = next;
+                            this.send_command(ClientCommand::SelectPane { pane_index: next });
+                            cx.notify();
+                        }
+                    }
+                    "t" => {
+                        this.snapshot.show_thinking = !this.snapshot.show_thinking;
+                        this.send_command(ClientCommand::ToggleThinking);
+                        cx.notify();
+                    }
+                    _ => {}
+                }
+            }))
             .child(self.render_header(cx))
             .child(
                 div()
@@ -1005,16 +1789,11 @@ impl Render for CockpitApp {
                     .flex_1()
                     .size_full()
                     .child(self.render_sidebar(cx))
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .flex_1()
-                            .h_full()
-                            .child(self.render_timeline(cx))
-                            .child(self.render_composer(cx)),
-                    )
-                    .child(self.render_inspector(cx)),
+                    .child(match selected_tab {
+                        0 => self.render_dashboard(cx).into_any_element(),
+                        1 => self.render_acp_servers(cx).into_any_element(),
+                        _ => self.render_swarm_cockpit(cx).into_any_element(),
+                    }),
             )
             .child(if let Some(perm) = &perm_opt {
                 self.render_permission_modal(perm, cx).into_any_element()
