@@ -1140,10 +1140,21 @@ mod tests {
         let start = Instant::now();
         telemetry.refresh(&start);
 
-        // Since .state/usage.json exists in this repository, total_tokens should be > 0
-        if Path::new(".state/usage.json").is_file() {
-            assert!(telemetry.total_tokens > 0);
-            assert!(telemetry.prompt_tokens > 0);
+        // If .state/usage.json exists, verify telemetry accurately reflects its totals
+        if let Ok(content) = std::fs::read_to_string(".state/usage.json")
+            && let Ok(v) = serde_json::from_str::<serde_json::Value>(&content)
+            && let Some(totals) = v.get("totals")
+        {
+            let expected_total = totals
+                .get("totalTokens")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let expected_prompt = totals
+                .get("promptTokens")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            assert_eq!(telemetry.total_tokens, expected_total);
+            assert_eq!(telemetry.prompt_tokens, expected_prompt);
         }
     }
 

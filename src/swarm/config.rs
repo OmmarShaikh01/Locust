@@ -358,6 +358,23 @@ agents:
             );
         }
     }
+
+    #[test]
+    fn test_test_swarm_config_files_parse() {
+        for path in ["agents/test-swarm/agents.yaml", "agents/test-swarm.yaml"] {
+            let config = SwarmConfig::load(Path::new(path))
+                .unwrap_or_else(|_| panic!("{path} should parse"));
+            assert_eq!(config.tabs.len(), 5);
+            assert_eq!(config.agents.len(), 21);
+            assert_every_tab_has_an_assignment(&config);
+            assert!(config.validate().is_empty(), "{:?}", config.validate());
+            for agent in &config.agents {
+                assert_eq!(agent.agent, "claude");
+                assert_eq!(agent.model, "claude-haiku-3-5");
+                assert_eq!(agent.effort.as_deref(), Some("low"));
+            }
+        }
+    }
     fn cfg(yaml: &str) -> SwarmConfig {
         serde_yaml::from_str(yaml).unwrap()
     }
