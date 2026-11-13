@@ -1,5 +1,5 @@
 use crate::acp::{AGENT_SPECS, AgentOutcome, AgentUpdate, CONTROLLER_SPEC_ID};
-use crate::app::telemetry::SystemTelemetry;
+use crate::core::telemetry::SystemTelemetry;
 use crate::swarm::{AgentAssignment, PaneGridPos, RunOutcome, SwarmConfig};
 use std::time::Instant;
 
@@ -441,7 +441,7 @@ impl Default for Model {
     fn default() -> Self {
         // `ARGS` is only set by `main()`; fall back to the default roster when it's unset,
         // which is always the case under `cargo test` (tests never go through `main`).
-        let configured_path = crate::app::ARGS
+        let configured_path = crate::ARGS
             .get()
             .map(|a| a.swarm_config.as_str())
             .unwrap_or("");
@@ -498,6 +498,112 @@ impl Default for Model {
 }
 
 impl Model {
+    pub fn snapshot(&self, project_path: &str) -> crate::ipc::protocol::ModelSnapshot {
+        use crate::ipc::protocol::*;
+
+        let acp_servers = self
+            .acp_servers
+            .iter()
+            .map(|s| AcpServerSnapshot {
+                id: s.id.to_string(),
+                name: s.name.to_string(),
+                transport: s.transport.to_string(),
+                command_line: s.command_line.clone(),
+                status: s.status.label().to_string(),
+                protocol: s.protocol.clone(),
+                ping_ms: s.ping_ms,
+                capabilities: s.capabilities.clone(),
+                connected_at_secs: s.connected_at.map(|t| t.elapsed().as_secs()),
+                recent_logs: s.recent_logs.clone(),
+                tokens_used: s.tokens_used,
+                context_size: s.context_size,
+                cost: s.cost.clone(),
+                stop_reason: s.stop_reason.clone(),
+            })
+            .collect();
+
+        let swarm_panes = self
+            .swarm_panes
+            .iter()
+            .map(|p| SwarmPaneSnapshot {
+                name: p.name.clone(),
+                agent: p.assignment.agent.clone(),
+                model: p.assignment.model.clone(),
+                task: p.assignment.task.clone().unwrap_or_default(),
+                status: p.status.label().to_string(),
+                output_lines: p.output.lines().map(String::from).collect(),
+                thinking_lines: p.live.thought.lines().map(String::from).collect(),
+                turns_used: 0,
+                tokens_used: p.tokens_used.unwrap_or(0),
+                phase: format!("{:?}", p.live.phase),
+                elapsed_secs: p.live.started.map(|t| t.elapsed().as_secs()).unwrap_or(0),
+                auto_route_budget: 0,
+                unread_count: 0,
+            })
+            .collect();
+
+        let controller_history = self
+            .controller_log
+            .iter()
+            .map(|m| ControllerMessageSnapshot {
+                role: match m.role {
+                    ControllerRole::User => "operator".to_string(),
+                    ControllerRole::Agent => "agent".to_string(),
+                    ControllerRole::System => "system".to_string(),
+                },
+                text: m.text.clone(),
+                timestamp_secs: 0,
+            })
+            .collect();
+
+        let tasks = self
+            .tasks
+            .iter()
+            .map(|t| TaskSnapshot {
+                id: t.id,
+                from: t.source.clone(),
+                to: t.target.clone(),
+                prompt: t.description.clone(),
+                status: match t.status {
+                    TaskStatus::Pending => "pending".to_string(),
+                    TaskStatus::Done => "done".to_string(),
+                    TaskStatus::Failed => "failed".to_string(),
+                },
+            })
+            .collect();
+
+        let active_permission = self.active_permission.as_ref().map(|p| PermissionSnapshot {
+            request_id: p.id.to_string(),
+            agent_id: p.agent_pane.clone(),
+            tool: p.tool_title.clone(),
+            params: p.detail.clone(),
+            seconds_left: p
+                .expires_at
+                .saturating_duration_since(Instant::now())
+                .as_secs(),
+        });
+
+        ModelSnapshot {
+            project_path: project_path.to_string(),
+            selected_tab: self.selected_tab,
+            dashboard_frame: self.dashboard_frame,
+            acp_selected_server: self.acp_selected_server,
+            acp_servers,
+            swarm_selected_pane: self.swarm_selected_pane,
+            swarm_panes,
+            show_thinking: self.show_thinking,
+            controller_history,
+            tasks,
+            active_permission,
+            activity_log: self.activity_log.clone(),
+            total_tokens_used: self.telemetry.total_tokens,
+            total_cost_usd: self.telemetry.total_cost.as_ref().map(|(c, _)| *c).unwrap_or(0.0),
+            total_invocations: self.telemetry.invocations,
+            turn_cap: self.limits.turn_cap as u32,
+            timeout_secs: self.limits.timeout_secs,
+        }
+    }
+
     pub fn refresh_telemetry(&mut self) {
         self.telemetry.refresh(&self.start_time);
     }
@@ -1070,7 +1176,7 @@ impl Model {
                 server.stop_reason = usage.stop_reason.clone();
                 self.acp_calls_made += 2; // session/new + session/prompt
 
-                crate::app::telemetry::record_tokens(
+                crate::core::telemetry::record_tokens(
                     server_id,
                     0,
                     0,
@@ -1357,7 +1463,7 @@ impl Model {
                     .unwrap_or_else(|| "USD".to_string());
                 self.swarm_panes[idx].cost = Some((cost, curr));
             }
-            crate::app::telemetry::record_tokens(
+            crate::core::telemetry::record_tokens(
                 &name,
                 0,
                 0,
