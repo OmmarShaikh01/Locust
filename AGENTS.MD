@@ -14,11 +14,26 @@
 - src/project: Lockfile and project directory isolation.
 - src/redact: Secret redaction filters.
 - src/logging: Structured in-memory ring buffer (5,000 entries) with log rotation file sink (.locust/locust.log).
-- src/core/state.rs: Pure state tree and state mutation engine with serializable snapshots (ModelSnapshot). Zero UI dependencies.
+- src/core/state/: Pure state tree and state mutation engine with serializable snapshots (ModelSnapshot). Zero UI dependencies. Split by concern (one `impl Model` block per file; `Model`'s own fields stay private but a few cross-file helpers are `pub(super)`):
+  - mod.rs: data types (AcpStatus, AcpServer, SwarmPaneState, Task, PaneLive, ProjectModal, PermissionModal), the `Model` struct + `Default` impl, core nav/snapshot methods (`snapshot`, `select_tab`/`next_tab`/`prev_tab`, `push_activity`, `refresh_telemetry`), and the private `write_private`/`sanitize_filename` file helpers.
+  - directives.rs: agent-to-agent message/task routing and dedup (`approved_directives`, `create_task`, `task_counts`, `cancel_swarm_pane`).
+  - permissions.rs: permission modal set/timeout (`set_permission_modal`, `check_permission_timeout`).
+  - export.rs: transcript export to `.locust/runs/<timestamp>/` (`export_transcripts`).
+  - controller.rs: Controller composer input, scroll, and reply handling.
+  - acp_servers.rs: ACP Servers tab selection/connect/telemetry (`next_server`, `begin_connect_selected`, `acp_tokens_used`, etc.).
+  - acp_events.rs: `apply_acp_update`, the single place any agent's real connection status/usage lands.
+  - swarm_panes.rs: Swarm pane selection, run lifecycle, turn events, scrolling, zoom/thinking toggles.
+  - project_modal.rs: switch-project dialog state.
+  - tests.rs: the full unit test module (unchanged by the split; see Test Suite Status).
 - src/core/telemetry.rs: Usage aggregation and system/process metrics calculations. Zero UI dependencies.
 - src/ipc: Length-delimited framed IPC protocol over Windows Named Pipes (`\\.\pipe\locust-{hash}`) and POSIX Unix Domain Sockets (`/tmp/locust-{hash}.sock`). Defines ClientCommand and ServerEvent schemas.
 - src/daemon: Headless service maintaining persistent ACP agent subprocesses, turn capping, directive auto-routing, and multi-client IPC broadcast.
 - src/gui: GPUI desktop frontend implementing the 12-column Swiss typographic grid, Twitter/X theme palette, timeline streaming cards, composer, inspector, and approval modals.
+- src/gui/app/: `CockpitApp` (the root GPUI entity) and `run_desktop`, split by view so no single file mixes unrelated tabs. Rendering methods defined outside mod.rs are `pub(super)` so the `Render` impl in mod.rs can dispatch to them:
+  - mod.rs: struct `CockpitApp`, `new`/`send_command`/pane-lookup helpers, the `Render` impl (layout shell only -- delegates key handling to `keymap.rs` and each tab's render to its own file), and `run_desktop`.
+  - keymap.rs: `handle_key_down`, the single key-event router for modal intercept, composer editing, and global tab/scroll navigation (previously an inline 487-line closure on `Render::render`).
+  - shell.rs: `render_header`, `render_sidebar` (persistent chrome around every tab).
+  - dashboard.rs / servers.rs / cockpit.rs / kanban.rs: one file per tab (Dashboard, ACP Servers, Swarm Cockpit, Kanban Tracker) matching the UI Navigation Views below.
 - src/gui/input.rs: Pure keyboard event translation engine (`key_to_char`) converting platform-specific `gpui::Keystroke` events into standard characters across Windows and POSIX layouts.
 
 ## UI Navigation and Views
@@ -58,3 +73,4 @@
 - Integration tests: 26 tests passing offline (tests/mock_acp.rs, 1 test ignored requiring agy CLI on PATH).
 - Execution command: cargo test.
 - Headless verification: cargo run -- --check, cargo run -- --usage.
+- Lint: cargo clippy --all-targets is warning-clean on our own code (ignore the unrelated proc-macro-error2 future-incompat notice from a dependency).
