@@ -475,22 +475,13 @@ mod tests {
             spec_for_agent_id("acp-antigravity").unwrap().id,
             "acp-antigravity"
         );
-        assert_eq!(
-            spec_for_agent_id("opencode").unwrap().id,
-            "acp-opencode"
-        );
+        assert_eq!(spec_for_agent_id("opencode").unwrap().id, "acp-opencode");
         assert_eq!(
             spec_for_agent_id("acp-opencode").unwrap().id,
             "acp-opencode"
         );
-        assert_eq!(
-            spec_for_agent_id("codex").unwrap().id,
-            "acp-codex"
-        );
-        assert_eq!(
-            spec_for_agent_id("acp-codex").unwrap().id,
-            "acp-codex"
-        );
+        assert_eq!(spec_for_agent_id("codex").unwrap().id, "acp-codex");
+        assert_eq!(spec_for_agent_id("acp-codex").unwrap().id, "acp-codex");
     }
 
     #[test]

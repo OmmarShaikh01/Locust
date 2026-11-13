@@ -597,7 +597,12 @@ impl Model {
             active_permission,
             activity_log: self.activity_log.clone(),
             total_tokens_used: self.telemetry.total_tokens,
-            total_cost_usd: self.telemetry.total_cost.as_ref().map(|(c, _)| *c).unwrap_or(0.0),
+            total_cost_usd: self
+                .telemetry
+                .total_cost
+                .as_ref()
+                .map(|(c, _)| *c)
+                .unwrap_or(0.0),
             total_invocations: self.telemetry.invocations,
             turn_cap: self.limits.turn_cap as u32,
             timeout_secs: self.limits.timeout_secs,

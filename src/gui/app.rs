@@ -59,55 +59,53 @@ impl CockpitApp {
 
         cx.spawn(async move |entity, app| {
             while let Ok(event) = event_rx.recv_async().await {
-                let _ = entity.update(app, |this: &mut CockpitApp, cx| {
-                    match event {
-                        ServerEvent::InitialSync {
-                            state,
-                            server_version: _,
-                        } => {
-                            this.snapshot = *state;
-                            this.connected = true;
-                            if this.snapshot.selected_tab == 2
-                                && this.is_orchestrator_pane(this.snapshot.swarm_selected_pane)
+                let _ = entity.update(app, |this: &mut CockpitApp, cx| match event {
+                    ServerEvent::InitialSync {
+                        state,
+                        server_version: _,
+                    } => {
+                        this.snapshot = *state;
+                        this.connected = true;
+                        if this.snapshot.selected_tab == 2
+                            && this.is_orchestrator_pane(this.snapshot.swarm_selected_pane)
+                        {
+                            this.composer_focused = true;
+                        }
+                        for msg in &this.snapshot.controller_history {
+                            if (msg.role == "operator" || msg.role == "user")
+                                && !msg.text.trim().is_empty()
                             {
-                                this.composer_focused = true;
-                            }
-                            for msg in &this.snapshot.controller_history {
-                                if (msg.role == "operator" || msg.role == "user")
-                                    && !msg.text.trim().is_empty()
-                                {
-                                    if this.history.last().map(|s| s.as_str()) != Some(&msg.text) {
-                                        this.history.push(msg.text.clone());
-                                    }
+                                if this.history.last().map(|s| s.as_str()) != Some(&msg.text) {
+                                    this.history.push(msg.text.clone());
                                 }
                             }
-                            cx.notify();
                         }
-                        ServerEvent::StateUpdated(state) => {
-                            this.snapshot = *state;
-                            cx.notify();
-                        }
-                        ServerEvent::TurnProgress {
-                            pane_name,
-                            delta_type,
-                            content,
-                        } => {
-                            if let Some(pane) = this
-                                .snapshot
-                                .swarm_panes
-                                .iter_mut()
-                                .find(|p| p.name == pane_name)
-                            {
-                                if delta_type == "thinking" {
-                                    pane.thinking_lines.push(content);
-                                } else {
-                                    pane.output_lines.push(content);
-                                }
-                                cx.notify();
-                            }
-                        }
-                        _ => {}
+                        cx.notify();
                     }
+                    ServerEvent::StateUpdated(state) => {
+                        this.snapshot = *state;
+                        cx.notify();
+                    }
+                    ServerEvent::TurnProgress {
+                        pane_name,
+                        delta_type,
+                        content,
+                    } => {
+                        if let Some(pane) = this
+                            .snapshot
+                            .swarm_panes
+                            .iter_mut()
+                            .find(|p| p.name == pane_name)
+                        {
+                            if delta_type == "thinking" {
+                                pane.thinking_lines.push(content);
+                            } else {
+                                pane.output_lines.push(content);
+                            }
+                            cx.notify();
+                        }
+                    }
+                    _ => {}
                 });
             }
         })
@@ -323,7 +321,12 @@ impl CockpitApp {
     }
 
     fn render_sidebar(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let tabs = ["0 DASHBOARD", "1 ACP SERVERS", "2 SWARM COCKPIT", "3 KANBAN TRACKER"];
+        let tabs = [
+            "0 DASHBOARD",
+            "1 ACP SERVERS",
+            "2 SWARM COCKPIT",
+            "3 KANBAN TRACKER",
+        ];
         let selected_tab = self.snapshot.selected_tab;
         let selected_pane = self.snapshot.swarm_selected_pane;
 
@@ -395,7 +398,10 @@ impl CockpitApp {
                                 MouseButton::Left,
                                 cx.listener(move |this, _, window, cx| {
                                     this.snapshot.selected_tab = idx;
-                                    if idx == 2 && this.is_orchestrator_pane(this.snapshot.swarm_selected_pane) {
+                                    if idx == 2
+                                        && this
+                                            .is_orchestrator_pane(this.snapshot.swarm_selected_pane)
+                                    {
                                         this.composer_focused = true;
                                     } else {
                                         this.composer_focused = false;
@@ -1325,13 +1331,15 @@ impl CockpitApp {
                             .child("AGENT HANDOFFS"),
                     )
                     .children(if self.snapshot.tasks.is_empty() {
-                        vec![div()
-                            .px(padding_md())
-                            .py(padding_sm())
-                            .font_family(font_family_sans())
-                            .text_size(font_size_body())
-                            .text_color(color_text_muted())
-                            .child("No active handoff tasks.")]
+                        vec![
+                            div()
+                                .px(padding_md())
+                                .py(padding_sm())
+                                .font_family(font_family_sans())
+                                .text_size(font_size_body())
+                                .text_color(color_text_muted())
+                                .child("No active handoff tasks."),
+                        ]
                     } else {
                         self.snapshot
                             .tasks
@@ -1358,10 +1366,7 @@ impl CockpitApp {
                                                     .text_size(font_size_caption())
                                                     .font_weight(FontWeight::BOLD)
                                                     .text_color(color_text_primary())
-                                                    .child(format!(
-                                                        "{} -> {}",
-                                                        task.from, task.to
-                                                    )),
+                                                    .child(format!("{} -> {}", task.from, task.to)),
                                             )
                                             .child(
                                                 div()
@@ -1675,7 +1680,10 @@ impl CockpitApp {
                                     .font_family(font_family_sans())
                                     .text_size(font_size_caption())
                                     .text_color(color_text_muted())
-                                    .child(format!("{} invocations", self.snapshot.total_invocations)),
+                                    .child(format!(
+                                        "{} invocations",
+                                        self.snapshot.total_invocations
+                                    )),
                             ),
                     )
                     .child(
@@ -1697,7 +1705,10 @@ impl CockpitApp {
                                     .text_size(font_size_header())
                                     .font_weight(FontWeight::BOLD)
                                     .text_color(color_text_primary())
-                                    .child(format!("{} Configured", self.snapshot.acp_servers.len())),
+                                    .child(format!(
+                                        "{} Configured",
+                                        self.snapshot.acp_servers.len()
+                                    )),
                             )
                             .child(
                                 div()
@@ -1774,7 +1785,8 @@ impl CockpitApp {
                                                 cx.listener(move |this, _, window, cx| {
                                                     this.snapshot.selected_tab = 2;
                                                     this.snapshot.swarm_selected_pane = idx;
-                                                    this.composer_focused = this.is_orchestrator_pane(idx);
+                                                    this.composer_focused =
+                                                        this.is_orchestrator_pane(idx);
                                                     window.focus(&this.focus_handle);
                                                     this.send_command(ClientCommand::SwitchTab {
                                                         tab_index: 2,
@@ -1825,7 +1837,10 @@ impl CockpitApp {
                                                             .font_family(font_family_sans())
                                                             .text_size(font_size_caption())
                                                             .text_color(color_text_muted())
-                                                            .child(format!("{} turns", p.turns_used)),
+                                                            .child(format!(
+                                                                "{} turns",
+                                                                p.turns_used
+                                                            )),
                                                     )
                                                     .child(
                                                         div()
@@ -1878,13 +1893,15 @@ impl CockpitApp {
                                     .overflow_y_scroll()
                                     .track_scroll(&self.activity_scroll_handle)
                                     .children(if self.snapshot.activity_log.is_empty() {
-                                        vec![div()
-                                            .px(padding_md())
-                                            .py(padding_sm())
-                                            .font_family(font_family_sans())
-                                            .text_size(font_size_body())
-                                            .text_color(color_text_muted())
-                                            .child("No activity recorded yet. Swarm is idle.")]
+                                        vec![
+                                            div()
+                                                .px(padding_md())
+                                                .py(padding_sm())
+                                                .font_family(font_family_sans())
+                                                .text_size(font_size_body())
+                                                .text_color(color_text_muted())
+                                                .child("No activity recorded yet. Swarm is idle."),
+                                        ]
                                     } else {
                                         self.snapshot
                                             .activity_log
@@ -1897,17 +1914,19 @@ impl CockpitApp {
                                                     .border_color(color_border_subtle())
                                                     .font_family(font_family_sans())
                                                     .text_size(font_size_caption())
-                                                    .text_color(if entry.contains("ERROR")
-                                                        || entry.contains("failed")
-                                                    {
-                                                        color_danger_red()
-                                                    } else if entry.contains("done")
-                                                        || entry.contains("approved")
-                                                    {
-                                                        color_success_green()
-                                                    } else {
-                                                        color_text_muted()
-                                                    })
+                                                    .text_color(
+                                                        if entry.contains("ERROR")
+                                                            || entry.contains("failed")
+                                                        {
+                                                            color_danger_red()
+                                                        } else if entry.contains("done")
+                                                            || entry.contains("approved")
+                                                        {
+                                                            color_success_green()
+                                                        } else {
+                                                            color_text_muted()
+                                                        },
+                                                    )
                                                     .child(entry.clone())
                                             })
                                             .collect()
@@ -2031,211 +2050,210 @@ impl CockpitApp {
                             })),
                     ),
             )
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .flex_1()
-                    .h_full()
-                    .child(if let Some(s) = selected_server {
-                        div()
-                            .flex()
-                            .flex_col()
-                            .child(
-                                div()
-                                    .flex()
-                                    .flex_row()
-                                    .items_center()
-                                    .justify_between()
-                                    .px(padding_lg())
-                                    .py(padding_md())
-                                    .bg(color_surface())
-                                    .border_b_1()
-                                    .border_color(color_border())
-                                    .child(
-                                        div()
-                                            .flex()
-                                            .flex_col()
-                                            .child(
-                                                div()
-                                                    .font_family(font_family_sans())
-                                                    .text_size(font_size_header())
-                                                    .font_weight(FontWeight::BOLD)
-                                                    .text_color(color_text_primary())
-                                                    .child(s.name.clone()),
-                                            )
-                                            .child(
+            .child(div().flex().flex_col().flex_1().h_full().child(
+                if let Some(s) = selected_server {
+                    div()
+                        .flex()
+                        .flex_col()
+                        .child(
+                            div()
+                                .flex()
+                                .flex_row()
+                                .items_center()
+                                .justify_between()
+                                .px(padding_lg())
+                                .py(padding_md())
+                                .bg(color_surface())
+                                .border_b_1()
+                                .border_color(color_border())
+                                .child(
+                                    div()
+                                        .flex()
+                                        .flex_col()
+                                        .child(
+                                            div()
+                                                .font_family(font_family_sans())
+                                                .text_size(font_size_header())
+                                                .font_weight(FontWeight::BOLD)
+                                                .text_color(color_text_primary())
+                                                .child(s.name.clone()),
+                                        )
+                                        .child(
+                                            div()
+                                                .font_family(font_family_sans())
+                                                .text_size(font_size_caption())
+                                                .text_color(color_text_muted())
+                                                .child(format!(
+                                                    "Transport: {} | Protocol: {}",
+                                                    s.transport, s.protocol
+                                                )),
+                                        ),
+                                )
+                                .child(
+                                    div()
+                                        .px(padding_md())
+                                        .py(padding_xs())
+                                        .rounded(radius_xs())
+                                        .bg(color_bg_base())
+                                        .border_1()
+                                        .border_color(color_border())
+                                        .font_family(font_family_sans())
+                                        .text_size(font_size_caption())
+                                        .text_color(color_text_muted())
+                                        .child(format!("Ping: {}ms", s.ping_ms)),
+                                ),
+                        )
+                        .child(
+                            div()
+                                .flex()
+                                .flex_col()
+                                .child(
+                                    div()
+                                        .font_family(font_family_sans())
+                                        .text_size(font_size_caption())
+                                        .font_weight(FontWeight::BOLD)
+                                        .text_color(color_text_muted())
+                                        .px(padding_md())
+                                        .py(padding_sm())
+                                        .bg(color_surface())
+                                        .border_b_1()
+                                        .border_color(color_border_subtle())
+                                        .child("COMMAND LINE"),
+                                )
+                                .child(
+                                    div()
+                                        .px(padding_md())
+                                        .py(padding_sm())
+                                        .bg(color_bg_base())
+                                        .border_b_1()
+                                        .border_color(color_border())
+                                        .font_family(font_family_sans())
+                                        .text_size(font_size_body())
+                                        .text_color(color_accent_blue())
+                                        .child(if s.command_line.is_empty() {
+                                            "Internal In-Memory Agent".to_string()
+                                        } else {
+                                            s.command_line.clone()
+                                        }),
+                                ),
+                        )
+                        .child(
+                            div()
+                                .flex()
+                                .flex_col()
+                                .child(
+                                    div()
+                                        .font_family(font_family_sans())
+                                        .text_size(font_size_caption())
+                                        .font_weight(FontWeight::BOLD)
+                                        .text_color(color_text_muted())
+                                        .px(padding_md())
+                                        .py(padding_sm())
+                                        .bg(color_surface())
+                                        .border_b_1()
+                                        .border_color(color_border_subtle())
+                                        .child("CAPABILITIES"),
+                                )
+                                .child(
+                                    div()
+                                        .flex()
+                                        .flex_row()
+                                        .gap(gap_xs())
+                                        .px(padding_md())
+                                        .py(padding_sm())
+                                        .bg(color_bg_base())
+                                        .border_b_1()
+                                        .border_color(color_border())
+                                        .children(if s.capabilities.is_empty() {
+                                            vec![
                                                 div()
                                                     .font_family(font_family_sans())
                                                     .text_size(font_size_caption())
                                                     .text_color(color_text_muted())
-                                                    .child(format!(
-                                                        "Transport: {} | Protocol: {}",
-                                                        s.transport, s.protocol
-                                                    )),
-                                            ),
-                                    )
-                                    .child(
-                                        div()
-                                            .px(padding_md())
-                                            .py(padding_xs())
-                                            .rounded(radius_xs())
-                                            .bg(color_bg_base())
-                                            .border_1()
-                                            .border_color(color_border())
-                                            .font_family(font_family_sans())
-                                            .text_size(font_size_caption())
-                                            .text_color(color_text_muted())
-                                            .child(format!("Ping: {}ms", s.ping_ms)),
-                                    ),
-                            )
-                            .child(
-                                div()
-                                    .flex()
-                                    .flex_col()
-                                    .child(
-                                        div()
-                                            .font_family(font_family_sans())
-                                            .text_size(font_size_caption())
-                                            .font_weight(FontWeight::BOLD)
-                                            .text_color(color_text_muted())
-                                            .px(padding_md())
-                                            .py(padding_sm())
-                                            .bg(color_surface())
-                                            .border_b_1()
-                                            .border_color(color_border_subtle())
-                                            .child("COMMAND LINE"),
-                                    )
-                                    .child(
-                                        div()
-                                            .px(padding_md())
-                                            .py(padding_sm())
-                                            .bg(color_bg_base())
-                                            .border_b_1()
-                                            .border_color(color_border())
-                                            .font_family(font_family_sans())
-                                            .text_size(font_size_body())
-                                            .text_color(color_accent_blue())
-                                            .child(if s.command_line.is_empty() {
-                                                "Internal In-Memory Agent".to_string()
-                                            } else {
-                                                s.command_line.clone()
-                                            }),
-                                    ),
-                            )
-                            .child(
-                                div()
-                                    .flex()
-                                    .flex_col()
-                                    .child(
-                                        div()
-                                            .font_family(font_family_sans())
-                                            .text_size(font_size_caption())
-                                            .font_weight(FontWeight::BOLD)
-                                            .text_color(color_text_muted())
-                                            .px(padding_md())
-                                            .py(padding_sm())
-                                            .bg(color_surface())
-                                            .border_b_1()
-                                            .border_color(color_border_subtle())
-                                            .child("CAPABILITIES"),
-                                    )
-                                    .child(
-                                        div()
-                                            .flex()
-                                            .flex_row()
-                                            .gap(gap_xs())
-                                            .px(padding_md())
-                                            .py(padding_sm())
-                                            .bg(color_bg_base())
-                                            .border_b_1()
-                                            .border_color(color_border())
-                                            .children(if s.capabilities.is_empty() {
-                                                vec![div()
-                                                    .font_family(font_family_sans())
-                                                    .text_size(font_size_caption())
-                                                    .text_color(color_text_muted())
-                                                    .child("Default tool execution")]
-                                            } else {
-                                                s.capabilities
-                                                    .iter()
-                                                    .map(|c| {
-                                                        div()
-                                                            .px(padding_sm())
-                                                            .py(padding_xs())
-                                                            .rounded(radius_xs())
-                                                            .bg(color_surface())
-                                                            .border_1()
-                                                            .border_color(color_border())
-                                                            .font_family(font_family_sans())
-                                                            .text_size(font_size_caption())
-                                                            .text_color(color_text_primary())
-                                                            .child(c.clone())
-                                                    })
-                                                    .collect()
-                                            }),
-                                    ),
-                            )
-                            .child(
-                                div()
-                                    .flex()
-                                    .flex_col()
-                                    .flex_1()
-                                    .child(
-                                        div()
-                                            .font_family(font_family_sans())
-                                            .text_size(font_size_caption())
-                                            .font_weight(FontWeight::BOLD)
-                                            .text_color(color_text_muted())
-                                            .px(padding_md())
-                                            .py(padding_sm())
-                                            .bg(color_surface())
-                                            .border_b_1()
-                                            .border_color(color_border_subtle())
-                                            .child("RECENT SERVER LOGS"),
-                                    )
-                                    .child(
-                                        div()
-                                            .id("server-logs-scroll")
-                                            .flex()
-                                            .flex_col()
-                                            .flex_1()
-                                            .overflow_y_scroll()
-                                            .children(if s.recent_logs.is_empty() {
-                                                vec![div()
+                                                    .child("Default tool execution"),
+                                            ]
+                                        } else {
+                                            s.capabilities
+                                                .iter()
+                                                .map(|c| {
+                                                    div()
+                                                        .px(padding_sm())
+                                                        .py(padding_xs())
+                                                        .rounded(radius_xs())
+                                                        .bg(color_surface())
+                                                        .border_1()
+                                                        .border_color(color_border())
+                                                        .font_family(font_family_sans())
+                                                        .text_size(font_size_caption())
+                                                        .text_color(color_text_primary())
+                                                        .child(c.clone())
+                                                })
+                                                .collect()
+                                        }),
+                                ),
+                        )
+                        .child(
+                            div()
+                                .flex()
+                                .flex_col()
+                                .flex_1()
+                                .child(
+                                    div()
+                                        .font_family(font_family_sans())
+                                        .text_size(font_size_caption())
+                                        .font_weight(FontWeight::BOLD)
+                                        .text_color(color_text_muted())
+                                        .px(padding_md())
+                                        .py(padding_sm())
+                                        .bg(color_surface())
+                                        .border_b_1()
+                                        .border_color(color_border_subtle())
+                                        .child("RECENT SERVER LOGS"),
+                                )
+                                .child(
+                                    div()
+                                        .id("server-logs-scroll")
+                                        .flex()
+                                        .flex_col()
+                                        .flex_1()
+                                        .overflow_y_scroll()
+                                        .children(if s.recent_logs.is_empty() {
+                                            vec![
+                                                div()
                                                     .px(padding_md())
                                                     .py(padding_sm())
                                                     .font_family(font_family_sans())
                                                     .text_size(font_size_caption())
                                                     .text_color(color_text_muted())
-                                                    .child("No recent logs for this server.")]
-                                            } else {
-                                                s.recent_logs
-                                                    .iter()
-                                                    .map(|log| {
-                                                        div()
-                                                            .px(padding_md())
-                                                            .py(padding_xs())
-                                                            .border_b_1()
-                                                            .border_color(color_border_subtle())
-                                                            .font_family(font_family_sans())
-                                                            .text_size(font_size_caption())
-                                                            .text_color(color_text_muted())
-                                                            .child(log.clone())
-                                                    })
-                                                    .collect()
-                                            }),
-                                    ),
-                            )
-                    } else {
-                        div()
-                            .p(padding_lg())
-                            .font_family(font_family_sans())
-                            .text_size(font_size_body())
-                            .text_color(color_text_muted())
-                            .child("Select an ACP server to view configuration and status.")
-                    }),
-            )
+                                                    .child("No recent logs for this server."),
+                                            ]
+                                        } else {
+                                            s.recent_logs
+                                                .iter()
+                                                .map(|log| {
+                                                    div()
+                                                        .px(padding_md())
+                                                        .py(padding_xs())
+                                                        .border_b_1()
+                                                        .border_color(color_border_subtle())
+                                                        .font_family(font_family_sans())
+                                                        .text_size(font_size_caption())
+                                                        .text_color(color_text_muted())
+                                                        .child(log.clone())
+                                                })
+                                                .collect()
+                                        }),
+                                ),
+                        )
+                } else {
+                    div()
+                        .p(padding_lg())
+                        .font_family(font_family_sans())
+                        .text_size(font_size_body())
+                        .text_color(color_text_muted())
+                        .child("Select an ACP server to view configuration and status.")
+                },
+            ))
     }
 
     fn render_empty_column_card(text: &'static str) -> AnyElement {
@@ -2325,9 +2343,16 @@ impl CockpitApp {
             )
     }
 
-    fn render_kanban_inspector(&self, selected_key: &str, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_kanban_inspector(
+        &self,
+        selected_key: &str,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         let (title, sub, full_text, agent_name) = if selected_key.starts_with("task-") {
-            let task_id: u64 = selected_key.trim_start_matches("task-").parse().unwrap_or(0);
+            let task_id: u64 = selected_key
+                .trim_start_matches("task-")
+                .parse()
+                .unwrap_or(0);
             if let Some(t) = self.snapshot.tasks.iter().find(|t| t.id == task_id) {
                 (
                     format!("#TASK-{:03} Directive", t.id),
@@ -2336,7 +2361,12 @@ impl CockpitApp {
                     Some(t.to.clone()),
                 )
             } else {
-                ("Task Detail".to_string(), "".to_string(), "Task not found".to_string(), None)
+                (
+                    "Task Detail".to_string(),
+                    "".to_string(),
+                    "Task not found".to_string(),
+                    None,
+                )
             }
         } else if selected_key.starts_with("job-") {
             let name = selected_key.trim_start_matches("job-");
@@ -2344,7 +2374,10 @@ impl CockpitApp {
                 let thought = p.thinking_lines.last().cloned().unwrap_or_default();
                 let output = p.output_lines.last().cloned().unwrap_or_default();
                 let text = if !thought.is_empty() {
-                    format!("Role Contract:\n{}\n\nRecent Thought Stream:\n{}", p.task, thought)
+                    format!(
+                        "Role Contract:\n{}\n\nRecent Thought Stream:\n{}",
+                        p.task, thought
+                    )
                 } else if !output.is_empty() {
                     format!("Role Contract:\n{}\n\nLast Output:\n{}", p.task, output)
                 } else {
@@ -2352,15 +2385,28 @@ impl CockpitApp {
                 };
                 (
                     format!("Agent Worker: {}", p.name),
-                    format!("Agent: {} | Model: {} | Status: {} | Phase: {} | Tokens: {}", p.agent, p.model, p.status, p.phase, p.tokens_used),
+                    format!(
+                        "Agent: {} | Model: {} | Status: {} | Phase: {} | Tokens: {}",
+                        p.agent, p.model, p.status, p.phase, p.tokens_used
+                    ),
                     text,
                     Some(p.name.clone()),
                 )
             } else {
-                ("Job Detail".to_string(), "".to_string(), "Agent not found".to_string(), None)
+                (
+                    "Job Detail".to_string(),
+                    "".to_string(),
+                    "Agent not found".to_string(),
+                    None,
+                )
             }
         } else {
-            ("Work Item Detail".to_string(), "".to_string(), "".to_string(), None)
+            (
+                "Work Item Detail".to_string(),
+                "".to_string(),
+                "".to_string(),
+                None,
+            )
         };
 
         div()
@@ -2419,16 +2465,26 @@ impl CockpitApp {
                                     .text_color(color_bg_base())
                                     .cursor_pointer()
                                     .child("OPEN IN SWARM COCKPIT [O]")
-                                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                                        if let Some(target_idx) = this.find_pane_by_name(&target_name) {
-                                            this.snapshot.swarm_selected_pane = target_idx;
-                                            this.snapshot.selected_tab = 2;
-                                            this.composer_focused = this.is_orchestrator_pane(target_idx);
-                                            this.send_command(ClientCommand::SwitchTab { tab_index: 2 });
-                                            this.send_command(ClientCommand::SelectPane { pane_index: target_idx });
-                                            cx.notify();
-                                        }
-                                    }))
+                                    .on_mouse_down(
+                                        MouseButton::Left,
+                                        cx.listener(move |this, _, _, cx| {
+                                            if let Some(target_idx) =
+                                                this.find_pane_by_name(&target_name)
+                                            {
+                                                this.snapshot.swarm_selected_pane = target_idx;
+                                                this.snapshot.selected_tab = 2;
+                                                this.composer_focused =
+                                                    this.is_orchestrator_pane(target_idx);
+                                                this.send_command(ClientCommand::SwitchTab {
+                                                    tab_index: 2,
+                                                });
+                                                this.send_command(ClientCommand::SelectPane {
+                                                    pane_index: target_idx,
+                                                });
+                                                cx.notify();
+                                            }
+                                        }),
+                                    )
                             }))
                             .child(
                                 div()
@@ -2445,10 +2501,13 @@ impl CockpitApp {
                                     .cursor_pointer()
                                     .hover(|s| s.text_color(color_text_primary()))
                                     .child("CLOSE [ESC]")
-                                    .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, cx| {
-                                        this.kanban_selected_item = None;
-                                        cx.notify();
-                                    })),
+                                    .on_mouse_down(
+                                        MouseButton::Left,
+                                        cx.listener(|this, _, _, cx| {
+                                            this.kanban_selected_item = None;
+                                            cx.notify();
+                                        }),
+                                    ),
                             ),
                     ),
             )
@@ -2559,13 +2618,16 @@ impl CockpitApp {
                                     .text_color(color_bg_base())
                                     .cursor_pointer()
                                     .child("APPROVE [Y]")
-                                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                                        this.send_command(ClientCommand::ResolvePermission {
-                                            request_id: req_id_approve.clone(),
-                                            allowed: true,
-                                        });
-                                        cx.notify();
-                                    })),
+                                    .on_mouse_down(
+                                        MouseButton::Left,
+                                        cx.listener(move |this, _, _, cx| {
+                                            this.send_command(ClientCommand::ResolvePermission {
+                                                request_id: req_id_approve.clone(),
+                                                allowed: true,
+                                            });
+                                            cx.notify();
+                                        }),
+                                    ),
                             )
                             .child(
                                 div()
@@ -2579,13 +2641,16 @@ impl CockpitApp {
                                     .text_color(color_text_primary())
                                     .cursor_pointer()
                                     .child("DENY [ESC]")
-                                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                                        this.send_command(ClientCommand::ResolvePermission {
-                                            request_id: req_id_deny.clone(),
-                                            allowed: false,
-                                        });
-                                        cx.notify();
-                                    })),
+                                    .on_mouse_down(
+                                        MouseButton::Left,
+                                        cx.listener(move |this, _, _, cx| {
+                                            this.send_command(ClientCommand::ResolvePermission {
+                                                request_id: req_id_deny.clone(),
+                                                allowed: false,
+                                            });
+                                            cx.notify();
+                                        }),
+                                    ),
                             ),
                     )
                     .into_any_element(),
@@ -2603,9 +2668,11 @@ impl CockpitApp {
                 let task_key = format!("task-{}", task_id);
                 let is_selected = self.kanban_selected_item.as_deref() == Some(&task_key);
 
-                let is_target_active = self.find_pane_by_name(&to).and_then(|idx| panes.get(idx)).map(|p| {
-                    p.status.to_uppercase() == "RUNNING" || p.phase != "idle"
-                }).unwrap_or(false);
+                let is_target_active = self
+                    .find_pane_by_name(&to)
+                    .and_then(|idx| panes.get(idx))
+                    .map(|p| p.status.to_uppercase() == "RUNNING" || p.phase != "idle")
+                    .unwrap_or(false);
 
                 let col_target = match status_raw.to_lowercase().as_str() {
                     "done" => 2,
@@ -2645,9 +2712,17 @@ impl CockpitApp {
                     .flex()
                     .flex_col()
                     .w_full()
-                    .bg(if is_selected { color_surface_hover() } else { color_surface() })
+                    .bg(if is_selected {
+                        color_surface_hover()
+                    } else {
+                        color_surface()
+                    })
                     .border_1()
-                    .border_color(if is_selected { color_accent_blue() } else { color_border() })
+                    .border_color(if is_selected {
+                        color_accent_blue()
+                    } else {
+                        color_border()
+                    })
                     .border_l_2()
                     .border_color(col_accent)
                     .p(padding_sm())
@@ -2655,10 +2730,13 @@ impl CockpitApp {
                     .rounded(radius_xs())
                     .hover(|s| s.bg(color_surface_hover()))
                     .cursor_pointer()
-                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                        this.kanban_selected_item = Some(card_key_clone.clone());
-                        cx.notify();
-                    }))
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(move |this, _, _, cx| {
+                            this.kanban_selected_item = Some(card_key_clone.clone());
+                            cx.notify();
+                        }),
+                    )
                     .child(
                         div()
                             .flex()
@@ -2747,7 +2825,11 @@ impl CockpitApp {
                                     .font_family(font_family_sans())
                                     .text_size(px(10.0))
                                     .text_color(color_text_muted())
-                                    .child(if is_target_active { "Worker executing" } else { "Standby queue" }),
+                                    .child(if is_target_active {
+                                        "Worker executing"
+                                    } else {
+                                        "Standby queue"
+                                    }),
                             )
                             .child(
                                 div()
@@ -2757,16 +2839,26 @@ impl CockpitApp {
                                     .text_color(color_accent_blue())
                                     .hover(|s| s.text_color(color_text_primary()))
                                     .child("OPEN IN COCKPIT ->")
-                                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                                        if let Some(p_idx) = this.find_pane_by_name(&target_name) {
-                                            this.snapshot.swarm_selected_pane = p_idx;
-                                            this.snapshot.selected_tab = 2;
-                                            this.composer_focused = this.is_orchestrator_pane(p_idx);
-                                            this.send_command(ClientCommand::SwitchTab { tab_index: 2 });
-                                            this.send_command(ClientCommand::SelectPane { pane_index: p_idx });
-                                            cx.notify();
-                                        }
-                                    })),
+                                    .on_mouse_down(
+                                        MouseButton::Left,
+                                        cx.listener(move |this, _, _, cx| {
+                                            if let Some(p_idx) =
+                                                this.find_pane_by_name(&target_name)
+                                            {
+                                                this.snapshot.swarm_selected_pane = p_idx;
+                                                this.snapshot.selected_tab = 2;
+                                                this.composer_focused =
+                                                    this.is_orchestrator_pane(p_idx);
+                                                this.send_command(ClientCommand::SwitchTab {
+                                                    tab_index: 2,
+                                                });
+                                                this.send_command(ClientCommand::SelectPane {
+                                                    pane_index: p_idx,
+                                                });
+                                                cx.notify();
+                                            }
+                                        }),
+                                    ),
                             ),
                     )
                     .into_any_element();
@@ -2815,37 +2907,44 @@ impl CockpitApp {
                 };
 
                 let card_key_clone = job_key.clone();
-                let card = div()
-                    .flex()
-                    .flex_col()
-                    .w_full()
-                    .bg(if is_selected { color_surface_hover() } else { color_surface() })
-                    .border_1()
-                    .border_color(if is_selected { color_accent_blue() } else { color_border() })
-                    .border_l_2()
-                    .border_color(col_accent)
-                    .p(padding_sm())
-                    .gap(gap_xs())
-                    .rounded(radius_xs())
-                    .hover(|s| s.bg(color_surface_hover()))
-                    .cursor_pointer()
-                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                        this.kanban_selected_item = Some(card_key_clone.clone());
-                        cx.notify();
-                    }))
-                    .child(
-                        div()
-                            .flex()
-                            .flex_row()
-                            .items_center()
-                            .justify_between()
-                            .child(
-                                div()
-                                    .flex()
-                                    .flex_row()
-                                    .items_center()
-                                    .gap(gap_xs())
-                                    .child(
+                let card =
+                    div()
+                        .flex()
+                        .flex_col()
+                        .w_full()
+                        .bg(if is_selected {
+                            color_surface_hover()
+                        } else {
+                            color_surface()
+                        })
+                        .border_1()
+                        .border_color(if is_selected {
+                            color_accent_blue()
+                        } else {
+                            color_border()
+                        })
+                        .border_l_2()
+                        .border_color(col_accent)
+                        .p(padding_sm())
+                        .gap(gap_xs())
+                        .rounded(radius_xs())
+                        .hover(|s| s.bg(color_surface_hover()))
+                        .cursor_pointer()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _, _, cx| {
+                                this.kanban_selected_item = Some(card_key_clone.clone());
+                                cx.notify();
+                            }),
+                        )
+                        .child(
+                            div()
+                                .flex()
+                                .flex_row()
+                                .items_center()
+                                .justify_between()
+                                .child(
+                                    div().flex().flex_row().items_center().gap(gap_xs()).child(
                                         div()
                                             .font_family(font_family_sans())
                                             .text_size(font_size_caption())
@@ -2853,77 +2952,98 @@ impl CockpitApp {
                                             .text_color(color_text_primary())
                                             .child(p.name.clone()),
                                     ),
-                            )
-                            .child(
-                                div()
-                                    .font_family(font_family_sans())
-                                    .text_size(px(10.0))
-                                    .font_weight(FontWeight::BOLD)
-                                    .text_color(col_accent)
-                                    .child(if is_running { "ACTIVE JOB" } else if is_err { "ERROR" } else if is_done { "READY" } else { "STANDBY" }),
-                            ),
-                    )
-                    .child(
-                        div()
-                            .flex()
-                            .flex_row()
-                            .items_center()
-                            .justify_between()
-                            .font_family(font_family_sans())
-                            .text_size(px(10.0))
-                            .text_color(color_text_muted())
-                            .child(
-                                div()
-                                    .text_color(if p.phase != "idle" { color_warning_amber() } else { color_text_muted() })
-                                    .child(format!("Phase: {}", p.phase)),
-                            )
-                            .child(
-                                div().child(format!("{} tok | {} turns", p.tokens_used, p.turns_used)),
-                            ),
-                    )
-                    .child(
-                        div()
-                            .font_family(font_family_sans())
-                            .text_size(font_size_caption())
-                            .text_color(color_text_muted())
-                            .line_height(relative(1.3))
-                            .child(task_preview),
-                    )
-                    .child(
-                        div()
-                            .flex()
-                            .flex_row()
-                            .items_center()
-                            .justify_between()
-                            .pt(px(2.0))
-                            .border_t_1()
-                            .border_color(color_border_subtle())
-                            .child(
-                                div()
-                                    .font_family(font_family_sans())
-                                    .text_size(px(10.0))
-                                    .text_color(color_text_muted())
-                                    .child(format!("{} | {}", p.agent, p.model)),
-                            )
-                            .child(
-                                div()
-                                    .font_family(font_family_sans())
-                                    .text_size(px(10.0))
-                                    .font_weight(FontWeight::BOLD)
-                                    .text_color(color_accent_blue())
-                                    .hover(|s| s.text_color(color_text_primary()))
-                                    .child("INSPECT [O]")
-                                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
-                                        this.snapshot.swarm_selected_pane = p_idx;
-                                        this.snapshot.selected_tab = 2;
-                                        this.composer_focused = this.is_orchestrator_pane(p_idx);
-                                        this.send_command(ClientCommand::SwitchTab { tab_index: 2 });
-                                        this.send_command(ClientCommand::SelectPane { pane_index: p_idx });
-                                        cx.notify();
-                                    })),
-                            ),
-                    )
-                    .into_any_element();
+                                )
+                                .child(
+                                    div()
+                                        .font_family(font_family_sans())
+                                        .text_size(px(10.0))
+                                        .font_weight(FontWeight::BOLD)
+                                        .text_color(col_accent)
+                                        .child(if is_running {
+                                            "ACTIVE JOB"
+                                        } else if is_err {
+                                            "ERROR"
+                                        } else if is_done {
+                                            "READY"
+                                        } else {
+                                            "STANDBY"
+                                        }),
+                                ),
+                        )
+                        .child(
+                            div()
+                                .flex()
+                                .flex_row()
+                                .items_center()
+                                .justify_between()
+                                .font_family(font_family_sans())
+                                .text_size(px(10.0))
+                                .text_color(color_text_muted())
+                                .child(
+                                    div()
+                                        .text_color(if p.phase != "idle" {
+                                            color_warning_amber()
+                                        } else {
+                                            color_text_muted()
+                                        })
+                                        .child(format!("Phase: {}", p.phase)),
+                                )
+                                .child(div().child(format!(
+                                    "{} tok | {} turns",
+                                    p.tokens_used, p.turns_used
+                                ))),
+                        )
+                        .child(
+                            div()
+                                .font_family(font_family_sans())
+                                .text_size(font_size_caption())
+                                .text_color(color_text_muted())
+                                .line_height(relative(1.3))
+                                .child(task_preview),
+                        )
+                        .child(
+                            div()
+                                .flex()
+                                .flex_row()
+                                .items_center()
+                                .justify_between()
+                                .pt(px(2.0))
+                                .border_t_1()
+                                .border_color(color_border_subtle())
+                                .child(
+                                    div()
+                                        .font_family(font_family_sans())
+                                        .text_size(px(10.0))
+                                        .text_color(color_text_muted())
+                                        .child(format!("{} | {}", p.agent, p.model)),
+                                )
+                                .child(
+                                    div()
+                                        .font_family(font_family_sans())
+                                        .text_size(px(10.0))
+                                        .font_weight(FontWeight::BOLD)
+                                        .text_color(color_accent_blue())
+                                        .hover(|s| s.text_color(color_text_primary()))
+                                        .child("INSPECT [O]")
+                                        .on_mouse_down(
+                                            MouseButton::Left,
+                                            cx.listener(move |this, _, _, cx| {
+                                                this.snapshot.swarm_selected_pane = p_idx;
+                                                this.snapshot.selected_tab = 2;
+                                                this.composer_focused =
+                                                    this.is_orchestrator_pane(p_idx);
+                                                this.send_command(ClientCommand::SwitchTab {
+                                                    tab_index: 2,
+                                                });
+                                                this.send_command(ClientCommand::SelectPane {
+                                                    pane_index: p_idx,
+                                                });
+                                                cx.notify();
+                                            }),
+                                        ),
+                                ),
+                        )
+                        .into_any_element();
 
                 match col_target {
                     0 => col0_items.push(card),
@@ -2944,18 +3064,23 @@ impl CockpitApp {
             col0_items.push(Self::render_empty_column_card("No queued work in backlog"));
         }
         if col1_items.is_empty() {
-            col1_items.push(Self::render_empty_column_card("No agents currently executing"));
+            col1_items.push(Self::render_empty_column_card(
+                "No agents currently executing",
+            ));
         }
         if col2_items.is_empty() {
             col2_items.push(Self::render_empty_column_card("No completed work yet"));
         }
         if col3_items.is_empty() {
-            col3_items.push(Self::render_empty_column_card("Zero errors or blocked tasks"));
+            col3_items.push(Self::render_empty_column_card(
+                "Zero errors or blocked tasks",
+            ));
         }
 
-        let inspector_opt = self.kanban_selected_item.as_ref().map(|sel| {
-            self.render_kanban_inspector(sel, cx).into_any_element()
-        });
+        let inspector_opt = self
+            .kanban_selected_item
+            .as_ref()
+            .map(|sel| self.render_kanban_inspector(sel, cx).into_any_element());
 
         div()
             .flex()
@@ -3232,7 +3357,10 @@ impl Render for CockpitApp {
                         && (key_name == "v" || key_name == "V")
                     {
                         if let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) {
-                            let clean = text.replace("\r\n", " ").replace('\n', " ").replace('\r', " ");
+                            let clean = text
+                                .replace("\r\n", " ")
+                                .replace('\n', " ")
+                                .replace('\r', " ");
                             this.composer_input.push_str(&clean);
                             cx.notify();
                             return;
@@ -3244,7 +3372,9 @@ impl Render for CockpitApp {
                         && (key_name == "c" || key_name == "C")
                     {
                         if !this.composer_input.is_empty() {
-                            cx.write_to_clipboard(ClipboardItem::new_string(this.composer_input.clone()));
+                            cx.write_to_clipboard(ClipboardItem::new_string(
+                                this.composer_input.clone(),
+                            ));
                             return;
                         }
                     }
@@ -3262,7 +3392,9 @@ impl Render for CockpitApp {
                         "enter" => {
                             let text = this.composer_input.trim().to_string();
                             if !text.is_empty() {
-                                this.send_command(ClientCommand::SubmitControllerTurn { text: text.clone() });
+                                this.send_command(ClientCommand::SubmitControllerTurn {
+                                    text: text.clone(),
+                                });
                                 if this.history.last().map(|s| s.as_str()) != Some(&text) {
                                     this.history.push(text);
                                 }
@@ -3315,7 +3447,9 @@ impl Render for CockpitApp {
                             return;
                         }
                         "backspace" => {
-                            if event.keystroke.modifiers.control || event.keystroke.modifiers.platform {
+                            if event.keystroke.modifiers.control
+                                || event.keystroke.modifiers.platform
+                            {
                                 this.composer_input.clear();
                             } else {
                                 this.composer_input.pop();
@@ -3494,7 +3628,8 @@ impl Render for CockpitApp {
                     }
                     "2" => {
                         this.snapshot.selected_tab = 2;
-                        this.composer_focused = this.is_orchestrator_pane(this.snapshot.swarm_selected_pane);
+                        this.composer_focused =
+                            this.is_orchestrator_pane(this.snapshot.swarm_selected_pane);
                         this.send_command(ClientCommand::SwitchTab { tab_index: 2 });
                         cx.notify();
                     }
@@ -3507,7 +3642,8 @@ impl Render for CockpitApp {
                     "tab" => {
                         let next = (this.snapshot.selected_tab + 1) % 4;
                         this.snapshot.selected_tab = next;
-                        if next == 2 && this.is_orchestrator_pane(this.snapshot.swarm_selected_pane) {
+                        if next == 2 && this.is_orchestrator_pane(this.snapshot.swarm_selected_pane)
+                        {
                             this.composer_focused = true;
                         } else {
                             this.composer_focused = false;

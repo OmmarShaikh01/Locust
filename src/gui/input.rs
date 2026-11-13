@@ -13,17 +13,61 @@ pub fn key_to_char(keystroke: &Keystroke) -> Option<String> {
 
     match keystroke.key.as_str() {
         "space" => Some(" ".to_string()),
-        "minus" => Some(if keystroke.modifiers.shift { "_".to_string() } else { "-".to_string() }),
-        "equal" => Some(if keystroke.modifiers.shift { "+".to_string() } else { "=".to_string() }),
-        "comma" => Some(if keystroke.modifiers.shift { "<".to_string() } else { ",".to_string() }),
-        "period" => Some(if keystroke.modifiers.shift { ">".to_string() } else { ".".to_string() }),
-        "slash" => Some(if keystroke.modifiers.shift { "?".to_string() } else { "/".to_string() }),
-        "backslash" => Some(if keystroke.modifiers.shift { "|".to_string() } else { "\\".to_string() }),
-        "semicolon" => Some(if keystroke.modifiers.shift { ":".to_string() } else { ";".to_string() }),
-        "quote" => Some(if keystroke.modifiers.shift { "\"".to_string() } else { "'".to_string() }),
-        "backquote" | "grave" => Some(if keystroke.modifiers.shift { "~".to_string() } else { "`".to_string() }),
-        "bracketleft" => Some(if keystroke.modifiers.shift { "{".to_string() } else { "[".to_string() }),
-        "bracketright" => Some(if keystroke.modifiers.shift { "}".to_string() } else { "]".to_string() }),
+        "minus" => Some(if keystroke.modifiers.shift {
+            "_".to_string()
+        } else {
+            "-".to_string()
+        }),
+        "equal" => Some(if keystroke.modifiers.shift {
+            "+".to_string()
+        } else {
+            "=".to_string()
+        }),
+        "comma" => Some(if keystroke.modifiers.shift {
+            "<".to_string()
+        } else {
+            ",".to_string()
+        }),
+        "period" => Some(if keystroke.modifiers.shift {
+            ">".to_string()
+        } else {
+            ".".to_string()
+        }),
+        "slash" => Some(if keystroke.modifiers.shift {
+            "?".to_string()
+        } else {
+            "/".to_string()
+        }),
+        "backslash" => Some(if keystroke.modifiers.shift {
+            "|".to_string()
+        } else {
+            "\\".to_string()
+        }),
+        "semicolon" => Some(if keystroke.modifiers.shift {
+            ":".to_string()
+        } else {
+            ";".to_string()
+        }),
+        "quote" => Some(if keystroke.modifiers.shift {
+            "\"".to_string()
+        } else {
+            "'".to_string()
+        }),
+        "backquote" | "grave" => Some(if keystroke.modifiers.shift {
+            "~".to_string()
+        } else {
+            "`".to_string()
+        }),
+        "bracketleft" => Some(if keystroke.modifiers.shift {
+            "{".to_string()
+        } else {
+            "[".to_string()
+        }),
+        "bracketright" => Some(if keystroke.modifiers.shift {
+            "}".to_string()
+        } else {
+            "]".to_string()
+        }),
         k if k.chars().count() == 1 => {
             let c = k.chars().next().unwrap();
             if keystroke.modifiers.shift {
