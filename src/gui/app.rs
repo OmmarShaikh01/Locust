@@ -12,8 +12,13 @@ pub struct CockpitApp {
     snapshot: ModelSnapshot,
     connected: bool,
     composer_input: String,
+    composer_focused: bool,
     cmd_tx: Option<Sender<ClientCommand>>,
     focus_handle: FocusHandle,
+    timeline_scroll_handle: ScrollHandle,
+    sidebar_scroll_handle: ScrollHandle,
+    matrix_scroll_handle: ScrollHandle,
+    activity_scroll_handle: ScrollHandle,
 }
 
 impl CockpitApp {
@@ -25,8 +30,13 @@ impl CockpitApp {
             snapshot: ModelSnapshot::default(),
             connected: false,
             composer_input: String::new(),
+            composer_focused: false,
             cmd_tx: Some(cmd_tx),
             focus_handle: cx.focus_handle(),
+            timeline_scroll_handle: ScrollHandle::new(),
+            sidebar_scroll_handle: ScrollHandle::new(),
+            matrix_scroll_handle: ScrollHandle::new(),
+            activity_scroll_handle: ScrollHandle::new(),
         };
 
         cx.spawn(async move |entity, app| {
@@ -114,6 +124,35 @@ impl CockpitApp {
         if let Some(tx) = &self.cmd_tx {
             let _ = tx.send(cmd);
         }
+    }
+
+    pub fn is_orchestrator_pane(&self, pane_idx: usize) -> bool {
+        if let Some(pane) = self.snapshot.swarm_panes.get(pane_idx) {
+            let lower = pane.name.to_lowercase();
+            if lower.contains("orchestrator") || lower.contains("controller") {
+                return true;
+            }
+        }
+        if pane_idx == 0
+            && !self.snapshot.swarm_panes.iter().any(|p| {
+                let l = p.name.to_lowercase();
+                l.contains("orchestrator") || l.contains("controller")
+            })
+        {
+            return true;
+        }
+        false
+    }
+
+    pub fn orchestrator_pane_index(&self) -> usize {
+        self.snapshot
+            .swarm_panes
+            .iter()
+            .position(|p| {
+                let l = p.name.to_lowercase();
+                l.contains("orchestrator") || l.contains("controller")
+            })
+            .unwrap_or(0)
     }
 
     fn render_header(&self, _cx: &mut Context<Self>) -> impl IntoElement {
@@ -326,6 +365,9 @@ impl CockpitApp {
                     .flex()
                     .flex_col()
                     .flex_1()
+                    .id("sidebar-panes-scroll")
+                    .overflow_y_scroll()
+                    .track_scroll(&self.sidebar_scroll_handle)
                     .child(
                         div()
                             .font_family(font_family_sans())
@@ -336,7 +378,7 @@ impl CockpitApp {
                             .py(padding_sm())
                             .border_b_1()
                             .border_color(color_border_subtle())
-                            .child("SWARM PANES"),
+                            .child(format!("SWARM PANES ({})", self.snapshot.swarm_panes.len())),
                     )
                     .children(
                         self.snapshot
@@ -345,6 +387,7 @@ impl CockpitApp {
                             .enumerate()
                             .map(|(idx, pane)| {
                                 let is_active = selected_tab == 2 && idx == selected_pane;
+                                let is_orch = self.is_orchestrator_pane(idx);
                                 let dot_color = status_color(&pane.status);
                                 let bg = if is_active {
                                     color_surface()
@@ -411,10 +454,33 @@ impl CockpitApp {
                                     )
                                     .child(
                                         div()
-                                            .font_family(font_family_sans())
-                                            .text_size(font_size_caption())
-                                            .text_color(color_text_muted())
-                                            .child(pane.agent.clone()),
+                                            .flex()
+                                            .flex_row()
+                                            .items_center()
+                                            .gap(gap_xs())
+                                            .child(if is_orch {
+                                                div()
+                                                    .px(padding_xs())
+                                                    .py(px(1.0))
+                                                    .rounded(radius_xs())
+                                                    .bg(color_surface_hover())
+                                                    .border_1()
+                                                    .border_color(color_accent_blue())
+                                                    .font_family(font_family_sans())
+                                                    .text_size(px(9.0))
+                                                    .font_weight(FontWeight::BOLD)
+                                                    .text_color(color_accent_blue())
+                                                    .child("ORCH")
+                                            } else {
+                                                div()
+                                            })
+                                            .child(
+                                                div()
+                                                    .font_family(font_family_sans())
+                                                    .text_size(font_size_caption())
+                                                    .text_color(color_text_muted())
+                                                    .child(pane.agent.clone()),
+                                            ),
                                     )
                             }),
                     ),
@@ -437,6 +503,7 @@ impl CockpitApp {
                 .child("Select a pane to view transcript");
         };
 
+        let is_orch = self.is_orchestrator_pane(self.snapshot.swarm_selected_pane);
         let status_badge_color = status_color(&pane.status);
         let show_thinking = self.snapshot.show_thinking;
 
@@ -471,21 +538,35 @@ impl CockpitApp {
                                     .w(px(32.0))
                                     .h(px(32.0))
                                     .rounded(radius_xs())
-                                    .bg(color_surface_hover())
+                                    .bg(if is_orch {
+                                        color_surface_hover()
+                                    } else {
+                                        color_bg_base()
+                                    })
                                     .border_1()
-                                    .border_color(color_border())
+                                    .border_color(if is_orch {
+                                        color_accent_blue()
+                                    } else {
+                                        color_border()
+                                    })
                                     .font_family(font_family_sans())
                                     .text_size(font_size_body())
                                     .font_weight(FontWeight::BOLD)
-                                    .text_color(color_accent_blue())
-                                    .child(
+                                    .text_color(if is_orch {
+                                        color_accent_blue()
+                                    } else {
+                                        color_text_muted()
+                                    })
+                                    .child(if is_orch {
+                                        "O".to_string()
+                                    } else {
                                         pane.name
                                             .chars()
                                             .next()
                                             .unwrap_or('A')
                                             .to_uppercase()
-                                            .to_string(),
-                                    ),
+                                            .to_string()
+                                    }),
                             )
                             .child(
                                 div()
@@ -518,7 +599,17 @@ impl CockpitApp {
                                             .font_family(font_family_sans())
                                             .text_size(font_size_caption())
                                             .text_color(color_text_muted())
-                                            .child(format!("MODEL: {}", pane.model)),
+                                            .child(if is_orch {
+                                                format!(
+                                                    "ROLE: ORCHESTRATOR | MODEL: {} | DIRECT HUMAN INTERACTION CHANNEL",
+                                                    pane.model
+                                                )
+                                            } else {
+                                                format!(
+                                                    "ROLE: AUTONOMOUS WORKER | MODEL: {} | NON-INTERACTIVE EXECUTION STREAM",
+                                                    pane.model
+                                                )
+                                            }),
                                     ),
                             ),
                     )
@@ -528,6 +619,36 @@ impl CockpitApp {
                             .flex_row()
                             .items_center()
                             .gap(gap_sm())
+                            .child(
+                                div()
+                                    .px(padding_md())
+                                    .py(padding_xs())
+                                    .rounded(radius_xs())
+                                    .bg(if is_orch {
+                                        color_surface_hover()
+                                    } else {
+                                        color_bg_base()
+                                    })
+                                    .border_1()
+                                    .border_color(if is_orch {
+                                        color_accent_blue()
+                                    } else {
+                                        color_border()
+                                    })
+                                    .font_family(font_family_sans())
+                                    .text_size(font_size_caption())
+                                    .font_weight(FontWeight::BOLD)
+                                    .text_color(if is_orch {
+                                        color_accent_blue()
+                                    } else {
+                                        color_text_muted()
+                                    })
+                                    .child(if is_orch {
+                                        "INTERACTIVE ORCHESTRATOR"
+                                    } else {
+                                        "NON-INTERACTIVE AGENT"
+                                    }),
+                            )
                             .child(
                                 div()
                                     .px(padding_md())
@@ -579,54 +700,137 @@ impl CockpitApp {
             )
             .child(
                 div()
+                    .id("timeline-scroll-feed")
                     .flex()
                     .flex_col()
                     .flex_1()
                     .size_full()
-                    .child(if show_thinking && !pane.thinking_lines.is_empty() {
-                        div()
-                            .flex()
-                            .flex_col()
-                            .p(padding_md())
-                            .bg(color_surface())
-                            .border_b_1()
-                            .border_color(color_border())
-                            .gap(gap_xs())
-                            .child(
-                                div()
-                                    .font_family(font_family_sans())
-                                    .text_size(font_size_caption())
-                                    .font_weight(FontWeight::BOLD)
-                                    .text_color(color_warning_amber())
-                                    .child("> INTERNAL REASONING (THINKING)"),
-                            )
-                            .children(pane.thinking_lines.iter().map(|line| {
-                                div()
-                                    .font_family(font_family_sans())
-                                    .text_size(font_size_body())
-                                    .text_color(color_text_muted())
-                                    .child(line.clone())
-                            }))
-                    } else {
-                        div()
-                    })
-                    .child(
+                    .overflow_y_scroll()
+                    .track_scroll(&self.timeline_scroll_handle)
+                    .child(if is_orch {
+                        // Orchestrator transcript: Human-to-Orchestrator conversation + thinking + dispatches
                         div()
                             .flex()
                             .flex_col()
                             .flex_1()
-                            .p(padding_md())
-                            .gap(gap_xs())
-                            .children(if pane.output_lines.is_empty() {
+                            .child(
+                                div()
+                                    .px(padding_md())
+                                    .py(padding_xs())
+                                    .bg(color_surface())
+                                    .border_b_1()
+                                    .border_color(color_border_subtle())
+                                    .font_family(font_family_sans())
+                                    .text_size(font_size_caption())
+                                    .font_weight(FontWeight::BOLD)
+                                    .text_color(color_accent_blue())
+                                    .child("OPERATOR <-> ORCHESTRATOR DIALOGUE"),
+                            )
+                            .children(if self.snapshot.controller_history.is_empty() {
                                 vec![div()
+                                    .px(padding_md())
+                                    .py(padding_md())
                                     .font_family(font_family_sans())
                                     .text_size(font_size_body())
                                     .text_color(color_text_muted())
-                                    .child("No output yet. Submit a directive to begin.")]
+                                    .child("No dialogue recorded yet. Submit instructions in the composer below to direct the Orchestrator.")]
                             } else {
-                                pane.output_lines
+                                self.snapshot
+                                    .controller_history
                                     .iter()
-                                    .map(|line| {
+                                    .map(|msg| {
+                                        let is_user = msg.role == "operator" || msg.role == "user";
+                                        let is_agent = msg.role == "agent";
+                                        let role_color = if is_user {
+                                            color_accent_blue()
+                                        } else if is_agent {
+                                            color_success_green()
+                                        } else {
+                                            color_text_muted()
+                                        };
+                                        let role_label = if is_user {
+                                            "OPERATOR"
+                                        } else if is_agent {
+                                            "MISSION ORCHESTRATOR"
+                                        } else {
+                                            "SYSTEM"
+                                        };
+
+                                        div()
+                                            .flex()
+                                            .flex_col()
+                                            .px(padding_md())
+                                            .py(padding_sm())
+                                            .border_b_1()
+                                            .border_color(color_border_subtle())
+                                            .border_l_2()
+                                            .border_color(role_color)
+                                            .bg(if is_user {
+                                                color_surface()
+                                            } else {
+                                                color_bg_base()
+                                            })
+                                            .gap(gap_xs())
+                                            .child(
+                                                div()
+                                                    .font_family(font_family_sans())
+                                                    .text_size(font_size_caption())
+                                                    .font_weight(FontWeight::BOLD)
+                                                    .text_color(role_color)
+                                                    .child(role_label),
+                                            )
+                                            .child(
+                                                div()
+                                                    .font_family(font_family_sans())
+                                                    .text_size(font_size_body())
+                                                    .text_color(color_text_primary())
+                                                    .child(msg.text.clone()),
+                                            )
+                                    })
+                                    .collect()
+                            })
+                            .child(if show_thinking && !pane.thinking_lines.is_empty() {
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .p(padding_md())
+                                    .bg(color_surface())
+                                    .border_b_1()
+                                    .border_color(color_border())
+                                    .gap(gap_xs())
+                                    .child(
+                                        div()
+                                            .font_family(font_family_sans())
+                                            .text_size(font_size_caption())
+                                            .font_weight(FontWeight::BOLD)
+                                            .text_color(color_warning_amber())
+                                            .child("> ORCHESTRATOR STRATEGY & REASONING"),
+                                    )
+                                    .children(pane.thinking_lines.iter().map(|line| {
+                                        div()
+                                            .font_family(font_family_sans())
+                                            .text_size(font_size_body())
+                                            .text_color(color_text_muted())
+                                            .child(line.clone())
+                                    }))
+                            } else {
+                                div()
+                            })
+                            .child(if !pane.output_lines.is_empty() {
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .p(padding_md())
+                                    .gap(gap_xs())
+                                    .child(
+                                        div()
+                                            .font_family(font_family_sans())
+                                            .text_size(font_size_caption())
+                                            .font_weight(FontWeight::BOLD)
+                                            .text_color(color_text_muted())
+                                            .child("> ORCHESTRATOR DELEGATIONS & ACTIVITY"),
+                                    )
+                                    .children(pane.output_lines.iter().map(|line| {
                                         div()
                                             .p(padding_xs())
                                             .border_b_1()
@@ -635,82 +839,308 @@ impl CockpitApp {
                                             .text_size(font_size_body())
                                             .text_color(color_text_primary())
                                             .child(line.clone())
-                                    })
-                                    .collect()
-                            }),
-                    ),
+                                    }))
+                            } else {
+                                div()
+                            })
+                    } else {
+                        // Autonomous Worker Pane: Verbose thinking + execution state stream
+                        div()
+                            .flex()
+                            .flex_col()
+                            .flex_1()
+                            .child(
+                                // Execution State Ribbon
+                                div()
+                                    .flex()
+                                    .flex_row()
+                                    .items_center()
+                                    .justify_between()
+                                    .px(padding_md())
+                                    .py(padding_xs())
+                                    .bg(color_surface())
+                                    .border_b_1()
+                                    .border_color(color_border())
+                                    .font_family(font_family_sans())
+                                    .text_size(font_size_caption())
+                                    .child(
+                                        div()
+                                            .flex()
+                                            .flex_row()
+                                            .gap(gap_md())
+                                            .child(
+                                                div()
+                                                    .text_color(status_badge_color)
+                                                    .font_weight(FontWeight::BOLD)
+                                                    .child(format!("STATUS: {}", pane.status.to_uppercase())),
+                                            )
+                                            .child(
+                                                div()
+                                                    .text_color(color_text_muted())
+                                                    .child(format!("PHASE: {}", if pane.phase.is_empty() { "WAITING" } else { &pane.phase })),
+                                            )
+                                            .child(
+                                                div()
+                                                    .text_color(color_text_muted())
+                                                    .child(format!("TURNS: {}", pane.turns_used)),
+                                            )
+                                            .child(
+                                                div()
+                                                    .text_color(color_text_muted())
+                                                    .child(format!("TOKENS: {}", pane.tokens_used)),
+                                            ),
+                                    )
+                                    .child(
+                                        div()
+                                            .text_color(color_text_muted())
+                                            .child(format!("RUNTIME: {}s", pane.elapsed_secs)),
+                                    ),
+                            )
+                            .child(
+                                // Verbose Thinking Stream (Always visible & prominent)
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .p(padding_md())
+                                    .bg(color_surface())
+                                    .border_b_1()
+                                    .border_color(color_border())
+                                    .gap(gap_xs())
+                                    .child(
+                                        div()
+                                            .font_family(font_family_sans())
+                                            .text_size(font_size_caption())
+                                            .font_weight(FontWeight::BOLD)
+                                            .text_color(color_warning_amber())
+                                            .child("> VERBOSE REASONING STREAM (INTERNAL THOUGHTS & DECISIONS)"),
+                                    )
+                                    .children(if pane.thinking_lines.is_empty() {
+                                        vec![div()
+                                            .font_family(font_family_sans())
+                                            .text_size(font_size_caption())
+                                            .text_color(color_text_muted())
+                                            .child("No internal reasoning steps logged for current task.")]
+                                    } else {
+                                        pane.thinking_lines
+                                            .iter()
+                                            .map(|line| {
+                                                div()
+                                                    .p(padding_xs())
+                                                    .border_b_1()
+                                                    .border_color(color_border_subtle())
+                                                    .font_family(font_family_sans())
+                                                    .text_size(font_size_body())
+                                                    .text_color(color_text_muted())
+                                                    .child(line.clone())
+                                            })
+                                            .collect()
+                                    }),
+                            )
+                            .child(
+                                // Autonomous Output / Tool Results Stream
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .flex_1()
+                                    .p(padding_md())
+                                    .gap(gap_xs())
+                                    .child(
+                                        div()
+                                            .font_family(font_family_sans())
+                                            .text_size(font_size_caption())
+                                            .font_weight(FontWeight::BOLD)
+                                            .text_color(color_text_muted())
+                                            .child("> AUTONOMOUS EXECUTION OUTPUT & TOOL RESULTS"),
+                                    )
+                                    .children(if pane.output_lines.is_empty() {
+                                        vec![div()
+                                            .font_family(font_family_sans())
+                                            .text_size(font_size_body())
+                                            .text_color(color_text_muted())
+                                            .child("Agent is waiting for task directives from Orchestrator.")]
+                                    } else {
+                                        pane.output_lines
+                                            .iter()
+                                            .map(|line| {
+                                                div()
+                                                    .p(padding_xs())
+                                                    .border_b_1()
+                                                    .border_color(color_border_subtle())
+                                                    .font_family(font_family_sans())
+                                                    .text_size(font_size_body())
+                                                    .text_color(color_text_primary())
+                                                    .child(line.clone())
+                                            })
+                                            .collect()
+                                    }),
+                            )
+                    }),
             )
     }
 
     fn render_composer(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let is_orch = self.is_orchestrator_pane(self.snapshot.swarm_selected_pane);
         let input_text = self.composer_input.clone();
+        let focused = self.composer_focused;
 
-        div()
-            .flex()
-            .flex_row()
-            .items_center()
-            .w_full()
-            .px(padding_md())
-            .py(padding_sm())
-            .bg(color_bg_base())
-            .border_t_1()
-            .border_color(color_border())
-            .gap(gap_sm())
-            .font_family(font_family_sans())
-            .child(
-                div()
-                    .flex()
-                    .flex_row()
-                    .items_center()
-                    .flex_1()
-                    .px(padding_md())
-                    .py(padding_xs())
-                    .rounded(radius_xs())
-                    .bg(color_surface())
-                    .border_1()
-                    .border_color(color_border())
-                    .child(
-                        div()
-                            .flex_1()
-                            .font_family(font_family_sans())
-                            .text_size(font_size_body())
-                            .text_color(if input_text.is_empty() {
-                                color_text_muted()
-                            } else {
-                                color_text_primary()
-                            })
-                            .child(if input_text.is_empty() {
-                                "Write directive @[Pane Name]: task or prompt Controller..."
-                                    .to_string()
-                            } else {
-                                input_text.clone()
+        if is_orch {
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .w_full()
+                .px(padding_md())
+                .py(padding_sm())
+                .bg(color_bg_base())
+                .border_t_1()
+                .border_color(color_border())
+                .gap(gap_sm())
+                .font_family(font_family_sans())
+                .child(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .flex_1()
+                        .px(padding_md())
+                        .py(padding_xs())
+                        .rounded(radius_xs())
+                        .bg(if focused {
+                            color_surface_hover()
+                        } else {
+                            color_surface()
+                        })
+                        .border_1()
+                        .border_color(if focused {
+                            color_accent_blue()
+                        } else {
+                            color_border()
+                        })
+                        .cursor_pointer()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(|this, _, _, _| {
+                                this.composer_focused = true;
                             }),
-                    ),
-            )
-            .child(
-                div()
-                    .px(padding_md())
-                    .py(padding_xs())
-                    .rounded(radius_xs())
-                    .bg(color_accent_blue())
-                    .hover(|s| s.opacity(0.85))
-                    .cursor_pointer()
-                    .font_family(font_family_sans())
-                    .text_size(font_size_body())
-                    .font_weight(FontWeight::BOLD)
-                    .text_color(color_text_primary())
-                    .child("SEND TURN")
-                    .on_mouse_down(
-                        MouseButton::Left,
-                        cx.listener(move |this, _, _, _| {
-                            if !input_text.is_empty() {
-                                this.send_command(ClientCommand::SubmitControllerTurn {
-                                    text: input_text.clone(),
+                        )
+                        .child(
+                            div()
+                                .flex_1()
+                                .font_family(font_family_sans())
+                                .text_size(font_size_body())
+                                .text_color(if input_text.is_empty() {
+                                    color_text_muted()
+                                } else {
+                                    color_text_primary()
+                                })
+                                .child(if input_text.is_empty() {
+                                    if focused {
+                                        "Type instruction for Orchestrator and press Enter...".to_string()
+                                    } else {
+                                        "Click or press Enter to direct Orchestrator (e.g. plan feature, direct swarm)...".to_string()
+                                    }
+                                } else {
+                                    format!("{input_text}{}", if focused { "_" } else { "" })
+                                }),
+                        ),
+                )
+                .child(
+                    div()
+                        .px(padding_md())
+                        .py(padding_xs())
+                        .rounded(radius_xs())
+                        .bg(color_accent_blue())
+                        .hover(|s| s.opacity(0.85))
+                        .cursor_pointer()
+                        .font_family(font_family_sans())
+                        .text_size(font_size_body())
+                        .font_weight(FontWeight::BOLD)
+                        .text_color(color_text_primary())
+                        .child("TALK TO ORCHESTRATOR")
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _, _, _| {
+                                if !input_text.is_empty() {
+                                    this.send_command(ClientCommand::SubmitControllerTurn {
+                                        text: input_text.clone(),
+                                    });
+                                    this.composer_input.clear();
+                                    this.composer_focused = false;
+                                }
+                            }),
+                        ),
+                )
+        } else {
+            // Non-interactive sub-agent notice bar with quick shortcut to switch to Orchestrator
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .justify_between()
+                .w_full()
+                .px(padding_md())
+                .py(padding_sm())
+                .bg(color_surface())
+                .border_t_1()
+                .border_color(color_border())
+                .gap(gap_md())
+                .font_family(font_family_sans())
+                .child(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .gap(gap_sm())
+                        .child(
+                            div()
+                                .px(padding_sm())
+                                .py(padding_xs())
+                                .rounded(radius_xs())
+                                .bg(color_bg_base())
+                                .border_1()
+                                .border_color(color_border())
+                                .font_family(font_family_sans())
+                                .text_size(font_size_caption())
+                                .font_weight(FontWeight::BOLD)
+                                .text_color(color_warning_amber())
+                                .child("NON-INTERACTIVE AGENT"),
+                        )
+                        .child(
+                            div()
+                                .font_family(font_family_sans())
+                                .text_size(font_size_caption())
+                                .text_color(color_text_muted())
+                                .child("Autonomous worker prints verbose thinking and state. Only the Orchestrator communicates with humans."),
+                        ),
+                )
+                .child(
+                    div()
+                        .px(padding_md())
+                        .py(padding_xs())
+                        .rounded(radius_xs())
+                        .bg(color_accent_blue())
+                        .hover(|s| s.opacity(0.85))
+                        .cursor_pointer()
+                        .font_family(font_family_sans())
+                        .text_size(font_size_caption())
+                        .font_weight(FontWeight::BOLD)
+                        .text_color(color_text_primary())
+                        .child("TALK TO ORCHESTRATOR [O]")
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(|this, _, _, _| {
+                                let orch_idx = this.orchestrator_pane_index();
+                                this.snapshot.selected_tab = 2;
+                                this.snapshot.swarm_selected_pane = orch_idx;
+                                this.composer_focused = true;
+                                this.send_command(ClientCommand::SwitchTab { tab_index: 2 });
+                                this.send_command(ClientCommand::SelectPane {
+                                    pane_index: orch_idx,
                                 });
-                            }
-                        }),
-                    ),
-            )
+                            }),
+                        ),
+                )
+        }
     }
 
     fn render_inspector(&self, _cx: &mut Context<Self>) -> impl IntoElement {
@@ -1260,8 +1690,12 @@ impl CockpitApp {
                             )
                             .child(
                                 div()
+                                    .id("dashboard-matrix-scroll")
                                     .flex()
                                     .flex_col()
+                                    .flex_1()
+                                    .overflow_y_scroll()
+                                    .track_scroll(&self.matrix_scroll_handle)
                                     .children(panes.iter().enumerate().map(|(idx, p)| {
                                         let status_col = status_color(&p.status);
                                         div()
@@ -1374,8 +1808,12 @@ impl CockpitApp {
                             )
                             .child(
                                 div()
+                                    .id("dashboard-activity-scroll")
                                     .flex()
                                     .flex_col()
+                                    .flex_1()
+                                    .overflow_y_scroll()
+                                    .track_scroll(&self.activity_scroll_handle)
                                     .children(if self.snapshot.activity_log.is_empty() {
                                         vec![div()
                                             .px(padding_md())
@@ -1454,8 +1892,11 @@ impl CockpitApp {
                     )
                     .child(
                         div()
+                            .id("servers-pool-scroll")
                             .flex()
                             .flex_col()
+                            .flex_1()
+                            .overflow_y_scroll()
                             .children(servers.iter().enumerate().map(|(idx, s)| {
                                 let is_active = idx == selected_idx;
                                 let status_col = status_color(&s.status);
@@ -1692,8 +2133,11 @@ impl CockpitApp {
                                     )
                                     .child(
                                         div()
+                                            .id("server-logs-scroll")
                                             .flex()
                                             .flex_col()
+                                            .flex_1()
+                                            .overflow_y_scroll()
                                             .children(if s.recent_logs.is_empty() {
                                                 vec![div()
                                                     .px(padding_md())
@@ -1749,7 +2193,43 @@ impl Render for CockpitApp {
             .font_family(font_family_sans())
             .track_focus(&self.focus_handle)
             .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
-                match event.keystroke.key.as_str() {
+                let is_orch = this.is_orchestrator_pane(this.snapshot.swarm_selected_pane);
+                let key_name = event.keystroke.key.as_str();
+
+                // If typing directly into Orchestrator composer
+                if this.composer_focused && is_orch && this.snapshot.selected_tab == 2 {
+                    match key_name {
+                        "enter" => {
+                            let text = this.composer_input.trim().to_string();
+                            if !text.is_empty() {
+                                this.send_command(ClientCommand::SubmitControllerTurn { text });
+                                this.composer_input.clear();
+                                this.composer_focused = false;
+                                cx.notify();
+                            }
+                        }
+                        "escape" => {
+                            this.composer_focused = false;
+                            cx.notify();
+                        }
+                        "backspace" => {
+                            this.composer_input.pop();
+                            cx.notify();
+                        }
+                        _ => {
+                            if let Some(ch) = &event.keystroke.key_char {
+                                if ch != "\n" && ch != "\r" && ch != "\t" {
+                                    this.composer_input.push_str(ch);
+                                    cx.notify();
+                                }
+                            }
+                        }
+                    }
+                    return;
+                }
+
+                // Global Navigation & Scrolling:
+                match key_name {
                     "0" => {
                         this.snapshot.selected_tab = 0;
                         this.send_command(ClientCommand::SwitchTab { tab_index: 0 });
@@ -1793,9 +2273,48 @@ impl Render for CockpitApp {
                             cx.notify();
                         }
                     }
+                    "o" | "O" => {
+                        let orch = this.orchestrator_pane_index();
+                        this.snapshot.selected_tab = 2;
+                        this.snapshot.swarm_selected_pane = orch;
+                        this.composer_focused = true;
+                        this.send_command(ClientCommand::SwitchTab { tab_index: 2 });
+                        this.send_command(ClientCommand::SelectPane { pane_index: orch });
+                        cx.notify();
+                    }
+                    "enter" => {
+                        if is_orch && this.snapshot.selected_tab == 2 {
+                            this.composer_focused = true;
+                            cx.notify();
+                        }
+                    }
+                    "pageup" | "k" => {
+                        let mut off = this.timeline_scroll_handle.offset();
+                        off.y = (off.y + px(150.0)).min(px(0.0));
+                        this.timeline_scroll_handle.set_offset(off);
+                        cx.notify();
+                    }
+                    "pagedown" | "j" => {
+                        let mut off = this.timeline_scroll_handle.offset();
+                        off.y -= px(150.0);
+                        this.timeline_scroll_handle.set_offset(off);
+                        cx.notify();
+                    }
+                    "home" => {
+                        this.timeline_scroll_handle.set_offset(Point::default());
+                        cx.notify();
+                    }
+                    "end" => {
+                        this.timeline_scroll_handle.scroll_to_bottom();
+                        cx.notify();
+                    }
                     "t" => {
                         this.snapshot.show_thinking = !this.snapshot.show_thinking;
                         this.send_command(ClientCommand::ToggleThinking);
+                        cx.notify();
+                    }
+                    "escape" => {
+                        this.composer_focused = false;
                         cx.notify();
                     }
                     _ => {}
