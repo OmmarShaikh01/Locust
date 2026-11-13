@@ -24,7 +24,12 @@
 - Tab 0: Dashboard (full-bleed 4-cell metrics banner, tabular swarm agent matrix, activity tracer).
 - Tab 1: ACP Servers (flush server pool list with 1px hairline divider rules, server specification sheet).
 - Tab 2: Swarm Cockpit (timeline transcript feed, flat composer bar, telemetry limits inspector).
-- Interactive Navigation: Left vertical sidebar serves as the single primary navigation spine. Duplicate top header tab pills are eliminated. Keyboard shortcuts (`0`, `1`, `2`, `Tab`, `[`, `]`, `t`, `Esc`) provide quick navigation.
+- Interactive Navigation: Left vertical sidebar serves as the single primary navigation spine. Duplicate top header tab pills are eliminated. Keyboard shortcuts (`0`, `1`, `2`, `Tab`, `[`, `]`, `t`, `o`, `PageUp`, `PageDown`, `Home`, `End`, `Esc`) provide quick navigation.
+
+## Swarm Interaction Model
+- Orchestrator-Only Human Interaction Spine: Only the Orchestrator (`Mission Orchestrator` / `Controller`) communicates with human operators. All sub-agents are strictly autonomous execution workers that print out their verbose reasoning stream (internal thoughts & decisions) and real-time execution state (phase, status, tokens, turns, runtime, output).
+- Non-Interactive Agent UI: Viewing non-orchestrator agent panes displays a `NON-INTERACTIVE AGENT` badge, prominent verbose reasoning stream, execution state ribbon, and a non-interactive status bar with an instant `[TALK TO ORCHESTRATOR [O]]` shortcut button.
+- Scrolling System: Full GPU-accelerated mouse-wheel, trackpad, and keyboard scrolling across all main panels (`id(...).overflow_y_scroll().track_scroll(...)`), including Swarm Cockpit timeline, sidebar agent list, dashboard agent matrix, and activity tracer.
 
 ## UI Typography and Layout Standard
 - Font: Enforces a single sans-serif typeface across all elements (`Segoe UI` on Windows, `Helvetica Neue` on macOS, `Arial` on Linux). Monospace and serif fonts are prohibited in the presentation layer.
