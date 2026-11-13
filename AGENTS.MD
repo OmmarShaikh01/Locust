@@ -25,7 +25,8 @@
 - Tab 0: Dashboard (full-bleed 4-cell metrics banner, tabular swarm agent matrix, activity tracer).
 - Tab 1: ACP Servers (flush server pool list with 1px hairline divider rules, server specification sheet).
 - Tab 2: Swarm Cockpit (timeline transcript feed, flat composer bar, telemetry limits inspector).
-- Interactive Navigation: Left vertical sidebar serves as the single primary navigation spine. Duplicate top header tab pills are eliminated. Keyboard shortcuts (`0`, `1`, `2`, `Tab`, `[`, `]`, `t`, `o`, `PageUp`, `PageDown`, `Home`, `End`, `Esc`) provide quick navigation.
+- Tab 3: Kanban Tracker (detailed 4-column Swiss Grid task/job board: Backlog/Queued, In Progress, Completed, Blocked/Failed/Permissions, metrics banner, filter pills, and bottom inspection drawer).
+- Interactive Navigation: Left vertical sidebar serves as the single primary navigation spine. Duplicate top header tab pills are eliminated. Keyboard shortcuts (`0`, `1`, `2`, `3`, `Tab`, `[`, `]`, `t`, `o`, `PageUp`, `PageDown`, `Home`, `End`, `Esc`) provide quick navigation.
 
 ## Keyboard Input and Focus Model
 - Default Orchestrator Focus: When viewing the Orchestrator on Tab 2, the composer is focused by default, presenting a visible active cursor and blue border.
