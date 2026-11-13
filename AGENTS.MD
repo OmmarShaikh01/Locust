@@ -19,12 +19,20 @@
 - src/ipc: Length-delimited framed IPC protocol over Windows Named Pipes (`\\.\pipe\locust-{hash}`) and POSIX Unix Domain Sockets (`/tmp/locust-{hash}.sock`). Defines ClientCommand and ServerEvent schemas.
 - src/daemon: Headless service maintaining persistent ACP agent subprocesses, turn capping, directive auto-routing, and multi-client IPC broadcast.
 - src/gui: GPUI desktop frontend implementing the 12-column Swiss typographic grid, Twitter/X theme palette, timeline streaming cards, composer, inspector, and approval modals.
+- src/gui/input.rs: Pure keyboard event translation engine (`key_to_char`) converting platform-specific `gpui::Keystroke` events into standard characters across Windows and POSIX layouts.
 
 ## UI Navigation and Views
 - Tab 0: Dashboard (full-bleed 4-cell metrics banner, tabular swarm agent matrix, activity tracer).
 - Tab 1: ACP Servers (flush server pool list with 1px hairline divider rules, server specification sheet).
 - Tab 2: Swarm Cockpit (timeline transcript feed, flat composer bar, telemetry limits inspector).
 - Interactive Navigation: Left vertical sidebar serves as the single primary navigation spine. Duplicate top header tab pills are eliminated. Keyboard shortcuts (`0`, `1`, `2`, `Tab`, `[`, `]`, `t`, `o`, `PageUp`, `PageDown`, `Home`, `End`, `Esc`) provide quick navigation.
+
+## Keyboard Input and Focus Model
+- Default Orchestrator Focus: When viewing the Orchestrator on Tab 2, the composer is focused by default, presenting a visible active cursor and blue border.
+- Resilient Character Translation: `key_to_char` handles both `key_char` (IME/translated text) and raw `key` tokens (mapping `"space"` to `" "`, punctuation keys, and Shift modifications), preventing dropped characters on Windows.
+- Auto-Focus Typing: Pressing any printable key while the Orchestrator composer is blurred automatically claims focus and inserts the character without loss.
+- Modal Keyboard Intercept: Active permission prompts capture `Enter`/`y` for approval and `Esc`/`n` for denial before normal routing.
+- Clipboard and Editing Shortcuts: Supports `Ctrl+V`/`Cmd+V` clipboard paste, `Ctrl+C`/`Cmd+C` copy, `Ctrl+U`/`Ctrl+Backspace` line clearing, `Enter` submission, `Backspace` deletion, and `Esc` blurring.
 
 ## Swarm Interaction Model
 - Orchestrator-Only Human Interaction Spine: Only the Orchestrator (`Mission Orchestrator` / `Controller`) communicates with human operators. All sub-agents are strictly autonomous execution workers that print out their verbose reasoning stream (internal thoughts & decisions) and real-time execution state (phase, status, tokens, turns, runtime, output).
@@ -38,7 +46,7 @@
 - Grid Philosophy: Full-bleed mathematical grid divided by 1px hairline borders (`border_b_1`, `border_r_1`, `border_t_1`, `border_l_1`), 2px solid accent left indicators on active items, and high-contrast uppercase tracked section headers.
 
 ## Test Suite Status
-- Unit tests: 99 tests passing offline.
+- Unit tests: 104 tests passing offline.
 - Integration tests: 26 tests passing offline (tests/mock_acp.rs, 1 test ignored requiring agy CLI on PATH).
 - Execution command: cargo test.
 - Headless verification: cargo run -- --check, cargo run -- --usage.

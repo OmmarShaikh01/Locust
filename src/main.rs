@@ -1,3 +1,5 @@
+#![recursion_limit = "512"]
+
 pub mod acp;
 pub mod core;
 pub mod daemon;

@@ -30,7 +30,7 @@ impl CockpitApp {
             snapshot: ModelSnapshot::default(),
             connected: false,
             composer_input: String::new(),
-            composer_focused: false,
+            composer_focused: true,
             cmd_tx: Some(cmd_tx),
             focus_handle: cx.focus_handle(),
             timeline_scroll_handle: ScrollHandle::new(),
@@ -49,6 +49,11 @@ impl CockpitApp {
                         } => {
                             this.snapshot = *state;
                             this.connected = true;
+                            if this.snapshot.selected_tab == 2
+                                && this.is_orchestrator_pane(this.snapshot.swarm_selected_pane)
+                            {
+                                this.composer_focused = true;
+                            }
                             cx.notify();
                         }
                         ServerEvent::StateUpdated(state) => {
@@ -353,9 +358,16 @@ impl CockpitApp {
                             .child(*title)
                             .on_mouse_down(
                                 MouseButton::Left,
-                                cx.listener(move |this, _, _, _| {
+                                cx.listener(move |this, _, window, cx| {
                                     this.snapshot.selected_tab = idx;
+                                    if idx == 2 && this.is_orchestrator_pane(this.snapshot.swarm_selected_pane) {
+                                        this.composer_focused = true;
+                                    } else {
+                                        this.composer_focused = false;
+                                    }
+                                    window.focus(&this.focus_handle);
                                     this.send_command(ClientCommand::SwitchTab { tab_index: idx });
+                                    cx.notify();
                                 }),
                             )
                     })),
@@ -415,15 +427,18 @@ impl CockpitApp {
                                     .cursor_pointer()
                                     .on_mouse_down(
                                         MouseButton::Left,
-                                        cx.listener(move |this, _, _, _| {
+                                        cx.listener(move |this, _, window, cx| {
                                             this.snapshot.selected_tab = 2;
                                             this.snapshot.swarm_selected_pane = idx;
+                                            this.composer_focused = this.is_orchestrator_pane(idx);
+                                            window.focus(&this.focus_handle);
                                             this.send_command(ClientCommand::SwitchTab {
                                                 tab_index: 2,
                                             });
                                             this.send_command(ClientCommand::SelectPane {
                                                 pane_index: idx,
                                             });
+                                            cx.notify();
                                         }),
                                     )
                                     .child(
@@ -1019,8 +1034,10 @@ impl CockpitApp {
                         .cursor_pointer()
                         .on_mouse_down(
                             MouseButton::Left,
-                            cx.listener(|this, _, _, _| {
+                            cx.listener(|this, _, window, cx| {
                                 this.composer_focused = true;
+                                window.focus(&this.focus_handle);
+                                cx.notify();
                             }),
                         )
                         .child(
@@ -1035,9 +1052,9 @@ impl CockpitApp {
                                 })
                                 .child(if input_text.is_empty() {
                                     if focused {
-                                        "Type instruction for Orchestrator and press Enter...".to_string()
+                                        "Type instruction for Orchestrator and press Enter (Esc to blur)...".to_string()
                                     } else {
-                                        "Click or press Enter to direct Orchestrator (e.g. plan feature, direct swarm)...".to_string()
+                                        "Click or type to direct Orchestrator (0/1/2 switch tabs, [ / ] switch agents)...".to_string()
                                     }
                                 } else {
                                     format!("{input_text}{}", if focused { "_" } else { "" })
@@ -1059,13 +1076,14 @@ impl CockpitApp {
                         .child("TALK TO ORCHESTRATOR")
                         .on_mouse_down(
                             MouseButton::Left,
-                            cx.listener(move |this, _, _, _| {
-                                if !input_text.is_empty() {
-                                    this.send_command(ClientCommand::SubmitControllerTurn {
-                                        text: input_text.clone(),
-                                    });
+                            cx.listener(move |this, _, window, cx| {
+                                let text = this.composer_input.trim().to_string();
+                                if !text.is_empty() {
+                                    this.send_command(ClientCommand::SubmitControllerTurn { text });
                                     this.composer_input.clear();
-                                    this.composer_focused = false;
+                                    this.composer_focused = true;
+                                    window.focus(&this.focus_handle);
+                                    cx.notify();
                                 }
                             }),
                         ),
@@ -1128,15 +1146,17 @@ impl CockpitApp {
                         .child("TALK TO ORCHESTRATOR [O]")
                         .on_mouse_down(
                             MouseButton::Left,
-                            cx.listener(|this, _, _, _| {
+                            cx.listener(|this, _, window, cx| {
                                 let orch_idx = this.orchestrator_pane_index();
                                 this.snapshot.selected_tab = 2;
                                 this.snapshot.swarm_selected_pane = orch_idx;
                                 this.composer_focused = true;
+                                window.focus(&this.focus_handle);
                                 this.send_command(ClientCommand::SwitchTab { tab_index: 2 });
                                 this.send_command(ClientCommand::SelectPane {
                                     pane_index: orch_idx,
                                 });
+                                cx.notify();
                             }),
                         ),
                 )
@@ -1711,15 +1731,18 @@ impl CockpitApp {
                                             .cursor_pointer()
                                             .on_mouse_down(
                                                 MouseButton::Left,
-                                                cx.listener(move |this, _, _, _| {
+                                                cx.listener(move |this, _, window, cx| {
                                                     this.snapshot.selected_tab = 2;
                                                     this.snapshot.swarm_selected_pane = idx;
+                                                    this.composer_focused = this.is_orchestrator_pane(idx);
+                                                    window.focus(&this.focus_handle);
                                                     this.send_command(ClientCommand::SwitchTab {
                                                         tab_index: 2,
                                                     });
                                                     this.send_command(ClientCommand::SelectPane {
                                                         pane_index: idx,
                                                     });
+                                                    cx.notify();
                                                 }),
                                             )
                                             .child(
@@ -2176,6 +2199,8 @@ impl CockpitApp {
     }
 }
 
+use crate::gui::input::key_to_char;
+
 impl Render for CockpitApp {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         if !self.focus_handle.is_focused(window) {
@@ -2193,61 +2218,254 @@ impl Render for CockpitApp {
             .font_family(font_family_sans())
             .track_focus(&self.focus_handle)
             .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
+                // 1. Permission request modal intercept
+                if let Some(perm) = &this.snapshot.active_permission {
+                    let req_id = perm.request_id.clone();
+                    match event.keystroke.key.as_str() {
+                        "escape" | "n" | "N" => {
+                            this.send_command(ClientCommand::ResolvePermission {
+                                request_id: req_id,
+                                allowed: false,
+                            });
+                            cx.notify();
+                            return;
+                        }
+                        "enter" | "y" | "Y" => {
+                            this.send_command(ClientCommand::ResolvePermission {
+                                request_id: req_id,
+                                allowed: true,
+                            });
+                            cx.notify();
+                            return;
+                        }
+                        _ => return,
+                    }
+                }
+
                 let is_orch = this.is_orchestrator_pane(this.snapshot.swarm_selected_pane);
+                let in_cockpit = this.snapshot.selected_tab == 2;
                 let key_name = event.keystroke.key.as_str();
 
-                // If typing directly into Orchestrator composer
-                if this.composer_focused && is_orch && this.snapshot.selected_tab == 2 {
+                // 2. Active Orchestrator Composer Input:
+                if in_cockpit && is_orch && this.composer_focused {
+                    // Clipboard paste (Ctrl+V / Cmd+V)
+                    if (event.keystroke.modifiers.control || event.keystroke.modifiers.platform)
+                        && (key_name == "v" || key_name == "V")
+                    {
+                        if let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) {
+                            let clean = text.replace("\r\n", " ").replace('\n', " ").replace('\r', " ");
+                            this.composer_input.push_str(&clean);
+                            cx.notify();
+                            return;
+                        }
+                    }
+
+                    // Clipboard copy (Ctrl+C / Cmd+C)
+                    if (event.keystroke.modifiers.control || event.keystroke.modifiers.platform)
+                        && (key_name == "c" || key_name == "C")
+                    {
+                        if !this.composer_input.is_empty() {
+                            cx.write_to_clipboard(ClipboardItem::new_string(this.composer_input.clone()));
+                            return;
+                        }
+                    }
+
+                    // Clear line (Ctrl+U or Ctrl+Backspace)
+                    if (event.keystroke.modifiers.control || event.keystroke.modifiers.platform)
+                        && (key_name == "u" || key_name == "U")
+                    {
+                        this.composer_input.clear();
+                        cx.notify();
+                        return;
+                    }
+
                     match key_name {
                         "enter" => {
                             let text = this.composer_input.trim().to_string();
                             if !text.is_empty() {
                                 this.send_command(ClientCommand::SubmitControllerTurn { text });
                                 this.composer_input.clear();
-                                this.composer_focused = false;
+                                this.composer_focused = true;
                                 cx.notify();
                             }
+                            return;
                         }
                         "escape" => {
                             this.composer_focused = false;
                             cx.notify();
+                            return;
                         }
                         "backspace" => {
-                            this.composer_input.pop();
+                            if event.keystroke.modifiers.control || event.keystroke.modifiers.platform {
+                                this.composer_input.clear();
+                            } else {
+                                this.composer_input.pop();
+                            }
                             cx.notify();
+                            return;
+                        }
+                        "pageup" => {
+                            let mut off = this.timeline_scroll_handle.offset();
+                            off.y = (off.y + px(150.0)).min(px(0.0));
+                            this.timeline_scroll_handle.set_offset(off);
+                            cx.notify();
+                            return;
+                        }
+                        "pagedown" => {
+                            let mut off = this.timeline_scroll_handle.offset();
+                            off.y -= px(150.0);
+                            this.timeline_scroll_handle.set_offset(off);
+                            cx.notify();
+                            return;
+                        }
+                        "home" => {
+                            this.timeline_scroll_handle.set_offset(Point::default());
+                            cx.notify();
+                            return;
+                        }
+                        "end" => {
+                            this.timeline_scroll_handle.scroll_to_bottom();
+                            cx.notify();
+                            return;
                         }
                         _ => {
-                            if let Some(ch) = &event.keystroke.key_char {
-                                if ch != "\n" && ch != "\r" && ch != "\t" {
-                                    this.composer_input.push_str(ch);
-                                    cx.notify();
-                                }
+                            if let Some(ch) = key_to_char(&event.keystroke) {
+                                this.composer_input.push_str(&ch);
+                                cx.notify();
+                                return;
                             }
                         }
                     }
                     return;
                 }
 
-                // Global Navigation & Scrolling:
+                // 3. Orchestrator Pane when composer is blurred (via Esc):
+                if in_cockpit && is_orch && !this.composer_focused {
+                    match key_name {
+                        "enter" | "o" | "O" => {
+                            this.composer_focused = true;
+                            cx.notify();
+                            return;
+                        }
+                        "0" => {
+                            this.snapshot.selected_tab = 0;
+                            this.send_command(ClientCommand::SwitchTab { tab_index: 0 });
+                            cx.notify();
+                            return;
+                        }
+                        "1" => {
+                            this.snapshot.selected_tab = 1;
+                            this.send_command(ClientCommand::SwitchTab { tab_index: 1 });
+                            cx.notify();
+                            return;
+                        }
+                        "2" => {
+                            this.composer_focused = true;
+                            cx.notify();
+                            return;
+                        }
+                        "tab" => {
+                            this.snapshot.selected_tab = 0;
+                            this.send_command(ClientCommand::SwitchTab { tab_index: 0 });
+                            cx.notify();
+                            return;
+                        }
+                        "[" => {
+                            if !this.snapshot.swarm_panes.is_empty() {
+                                let curr = this.snapshot.swarm_selected_pane;
+                                let prev = if curr == 0 {
+                                    this.snapshot.swarm_panes.len() - 1
+                                } else {
+                                    curr - 1
+                                };
+                                this.snapshot.swarm_selected_pane = prev;
+                                this.composer_focused = this.is_orchestrator_pane(prev);
+                                this.send_command(ClientCommand::SelectPane { pane_index: prev });
+                                cx.notify();
+                            }
+                            return;
+                        }
+                        "]" => {
+                            if !this.snapshot.swarm_panes.is_empty() {
+                                let curr = this.snapshot.swarm_selected_pane;
+                                let next = (curr + 1) % this.snapshot.swarm_panes.len();
+                                this.snapshot.swarm_selected_pane = next;
+                                this.composer_focused = this.is_orchestrator_pane(next);
+                                this.send_command(ClientCommand::SelectPane { pane_index: next });
+                                cx.notify();
+                            }
+                            return;
+                        }
+                        "pageup" => {
+                            let mut off = this.timeline_scroll_handle.offset();
+                            off.y = (off.y + px(150.0)).min(px(0.0));
+                            this.timeline_scroll_handle.set_offset(off);
+                            cx.notify();
+                            return;
+                        }
+                        "pagedown" => {
+                            let mut off = this.timeline_scroll_handle.offset();
+                            off.y -= px(150.0);
+                            this.timeline_scroll_handle.set_offset(off);
+                            cx.notify();
+                            return;
+                        }
+                        "home" => {
+                            this.timeline_scroll_handle.set_offset(Point::default());
+                            cx.notify();
+                            return;
+                        }
+                        "end" => {
+                            this.timeline_scroll_handle.scroll_to_bottom();
+                            cx.notify();
+                            return;
+                        }
+                        "t" => {
+                            this.snapshot.show_thinking = !this.snapshot.show_thinking;
+                            this.send_command(ClientCommand::ToggleThinking);
+                            cx.notify();
+                            return;
+                        }
+                        _ => {
+                            if let Some(ch) = key_to_char(&event.keystroke) {
+                                this.composer_focused = true;
+                                this.composer_input.push_str(&ch);
+                                cx.notify();
+                                return;
+                            }
+                        }
+                    }
+                    return;
+                }
+
+                // 4. Global Navigation & Scrolling (Tab 0, Tab 1, or non-orchestrator agent panes):
                 match key_name {
                     "0" => {
                         this.snapshot.selected_tab = 0;
+                        this.composer_focused = false;
                         this.send_command(ClientCommand::SwitchTab { tab_index: 0 });
                         cx.notify();
                     }
                     "1" => {
                         this.snapshot.selected_tab = 1;
+                        this.composer_focused = false;
                         this.send_command(ClientCommand::SwitchTab { tab_index: 1 });
                         cx.notify();
                     }
                     "2" => {
                         this.snapshot.selected_tab = 2;
+                        this.composer_focused = this.is_orchestrator_pane(this.snapshot.swarm_selected_pane);
                         this.send_command(ClientCommand::SwitchTab { tab_index: 2 });
                         cx.notify();
                     }
                     "tab" => {
                         let next = (this.snapshot.selected_tab + 1) % 3;
                         this.snapshot.selected_tab = next;
+                        if next == 2 && this.is_orchestrator_pane(this.snapshot.swarm_selected_pane) {
+                            this.composer_focused = true;
+                        } else {
+                            this.composer_focused = false;
+                        }
                         this.send_command(ClientCommand::SwitchTab { tab_index: next });
                         cx.notify();
                     }
@@ -2260,6 +2478,7 @@ impl Render for CockpitApp {
                                 curr - 1
                             };
                             this.snapshot.swarm_selected_pane = prev;
+                            this.composer_focused = this.is_orchestrator_pane(prev);
                             this.send_command(ClientCommand::SelectPane { pane_index: prev });
                             cx.notify();
                         }
@@ -2269,6 +2488,7 @@ impl Render for CockpitApp {
                             let curr = this.snapshot.swarm_selected_pane;
                             let next = (curr + 1) % this.snapshot.swarm_panes.len();
                             this.snapshot.swarm_selected_pane = next;
+                            this.composer_focused = this.is_orchestrator_pane(next);
                             this.send_command(ClientCommand::SelectPane { pane_index: next });
                             cx.notify();
                         }
@@ -2283,25 +2503,44 @@ impl Render for CockpitApp {
                         cx.notify();
                     }
                     "enter" => {
-                        if is_orch && this.snapshot.selected_tab == 2 {
+                        if is_orch && in_cockpit {
                             this.composer_focused = true;
                             cx.notify();
                         }
                     }
-                    "pageup" | "k" => {
-                        let mut off = this.timeline_scroll_handle.offset();
-                        off.y = (off.y + px(150.0)).min(px(0.0));
-                        this.timeline_scroll_handle.set_offset(off);
+                    "pageup" => {
+                        match this.snapshot.selected_tab {
+                            0 => {
+                                let mut off = this.matrix_scroll_handle.offset();
+                                off.y = (off.y + px(150.0)).min(px(0.0));
+                                this.matrix_scroll_handle.set_offset(off);
+                            }
+                            _ => {
+                                let mut off = this.timeline_scroll_handle.offset();
+                                off.y = (off.y + px(150.0)).min(px(0.0));
+                                this.timeline_scroll_handle.set_offset(off);
+                            }
+                        }
                         cx.notify();
                     }
-                    "pagedown" | "j" => {
-                        let mut off = this.timeline_scroll_handle.offset();
-                        off.y -= px(150.0);
-                        this.timeline_scroll_handle.set_offset(off);
+                    "pagedown" => {
+                        match this.snapshot.selected_tab {
+                            0 => {
+                                let mut off = this.matrix_scroll_handle.offset();
+                                off.y -= px(150.0);
+                                this.matrix_scroll_handle.set_offset(off);
+                            }
+                            _ => {
+                                let mut off = this.timeline_scroll_handle.offset();
+                                off.y -= px(150.0);
+                                this.timeline_scroll_handle.set_offset(off);
+                            }
+                        }
                         cx.notify();
                     }
                     "home" => {
                         this.timeline_scroll_handle.set_offset(Point::default());
+                        this.matrix_scroll_handle.set_offset(Point::default());
                         cx.notify();
                     }
                     "end" => {
