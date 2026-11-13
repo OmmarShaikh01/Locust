@@ -41,6 +41,22 @@ pub const SIDEBAR_COLS: usize = 2; // 2 / 12 = 16.67%
 pub const FEED_COLS: usize = 6; // 6 / 12 = 50.00%
 pub const INSPECTOR_COLS: usize = 4; // 4 / 12 = 33.33%
 
+/// Single sans-serif font family enforced across the entire interface.
+pub fn font_family_sans() -> &'static str {
+    #[cfg(target_os = "windows")]
+    {
+        "Segoe UI"
+    }
+    #[cfg(target_os = "macos")]
+    {
+        "Helvetica Neue"
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        "Arial"
+    }
+}
+
 pub fn spacing_unit() -> Pixels {
     px(4.0)
 }
@@ -58,6 +74,35 @@ pub fn padding_lg() -> Pixels {
 }
 pub fn padding_xl() -> Pixels {
     px(24.0)
+}
+
+pub fn gap_xs() -> Pixels {
+    px(4.0)
+}
+pub fn gap_sm() -> Pixels {
+    px(8.0)
+}
+pub fn gap_md() -> Pixels {
+    px(12.0)
+}
+pub fn gap_lg() -> Pixels {
+    px(16.0)
+}
+pub fn gap_xl() -> Pixels {
+    px(24.0)
+}
+
+pub fn radius_sm() -> Pixels {
+    px(4.0)
+}
+pub fn radius_md() -> Pixels {
+    px(8.0)
+}
+pub fn radius_lg() -> Pixels {
+    px(12.0)
+}
+pub fn radius_xl() -> Pixels {
+    px(16.0)
 }
 
 pub fn font_size_caption() -> Pixels {
