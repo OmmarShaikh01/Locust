@@ -1,17 +1,57 @@
 pub mod acp;
-pub mod app;
+pub mod core;
+pub mod daemon;
+pub mod gui;
+pub mod ipc;
 pub mod logging;
 pub mod project;
 pub mod redact;
 pub mod swarm;
 
-use crate::app::Args;
-use crate::app::{ARGS, Controller};
+use crate::daemon::DaemonServer;
+use crate::ipc::socket::{connect_stream, pipe_name_for_project};
 use crate::swarm::config::{DEFAULT_CONFIG_PATH, SwarmConfig};
 use clap::Parser;
 use std::io;
 use std::path::Path;
 use std::process::ExitCode;
+use std::sync::OnceLock;
+use std::thread;
+
+pub static ARGS: OnceLock<Args> = OnceLock::new();
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+pub struct Args {
+    /// Path to the project directory to open
+    #[arg(short, long, default_value = "")]
+    pub project: String,
+
+    /// Path to the swarm agents.yaml roster to load in the Swarm tab. Defaults to the
+    /// built-in full-software-dev-stack roster if not given.
+    #[arg(long, default_value = "")]
+    pub swarm_config: String,
+
+    /// Display aggregated swarm token usage and invocations telemetry
+    #[arg(long)]
+    pub usage: bool,
+
+    /// Write debug lines to .locust/locust.log too (default is info and above).
+    #[arg(long)]
+    pub debug: bool,
+
+    /// Validate the swarm roster and exit. Exit code 0 means the roster is sound.
+    #[arg(long)]
+    pub check: bool,
+
+    /// Run as persistent background daemon without desktop GUI window
+    #[arg(long)]
+    pub server: bool,
+}
+
+pub fn get_args() -> &'static Args {
+    ARGS.get().expect("Arguments have not been initialized yet")
+}
 
 /// Load the roster and print every problem. Returns the process exit code.
 fn run_check(path: &str) -> ExitCode {
@@ -44,23 +84,48 @@ fn run_check(path: &str) -> ExitCode {
 }
 
 fn run() -> io::Result<()> {
-    let global_args = app::get_args();
-    let path = if global_args.project.is_empty() {
+    let global_args = get_args();
+    let path_str = if global_args.project.is_empty() {
         "."
     } else {
         global_args.project.as_str()
     };
-    // One swarm per project: this takes the project's lock or fails with a clear message.
-    let project = project::Project::open(Path::new(path)).map_err(io::Error::other)?;
-    std::env::set_current_dir(&project.root)?;
-    logging::init(global_args.debug);
-    logging::log(
-        logging::Level::Info,
-        &format!("locust started in {}", project.root.display()),
-    );
-    project::remember_project(&project.root);
-    let mut controller = Controller::with_project(project);
-    ratatui::run(|terminal| controller.run(terminal))
+    let path = Path::new(path_str);
+
+    if global_args.server {
+        let project = project::Project::open(path).map_err(io::Error::other)?;
+        std::env::set_current_dir(&project.root)?;
+        logging::init(global_args.debug);
+        logging::log(
+            logging::Level::Info,
+            &format!("locust daemon started in {}", project.root.display()),
+        );
+        project::remember_project(&project.root);
+        let mut server = DaemonServer::new(project)?;
+        server.run_loop();
+        return Ok(());
+    }
+
+    // Desktop GUI client mode:
+    let pipe_name = pipe_name_for_project(path);
+    if connect_stream(&pipe_name).is_err() {
+        let project = project::Project::open(path).map_err(io::Error::other)?;
+        std::env::set_current_dir(&project.root)?;
+        logging::init(global_args.debug);
+        logging::log(
+            logging::Level::Info,
+            &format!("locust daemon autospawned in {}", project.root.display()),
+        );
+        project::remember_project(&project.root);
+        let mut server = DaemonServer::new(project)?;
+        thread::spawn(move || {
+            server.run_loop();
+        });
+        thread::sleep(std::time::Duration::from_millis(100));
+    }
+
+    gui::run_desktop(pipe_name);
+    Ok(())
 }
 
 fn main() -> ExitCode {
@@ -74,13 +139,12 @@ fn main() -> ExitCode {
     }
 
     if usage {
-        app::telemetry::print_usage_summary();
+        core::telemetry::print_usage_summary();
         return ExitCode::SUCCESS;
     }
 
     if check {
-        // --check validates the roster relative to the project directory, if one was given.
-        if let Some(dir) = Some(app::get_args().project.as_str()).filter(|d| !d.is_empty())
+        if let Some(dir) = Some(get_args().project.as_str()).filter(|d| !d.is_empty())
             && let Err(e) = std::env::set_current_dir(dir)
         {
             eprintln!("locust: cannot open project directory \"{dir}\": {e}");
