@@ -43,26 +43,21 @@ impl CockpitApp {
             // Clipboard paste (Ctrl+V / Cmd+V)
             if (event.keystroke.modifiers.control || event.keystroke.modifiers.platform)
                 && (key_name == "v" || key_name == "V")
+                && let Some(text) = cx.read_from_clipboard().and_then(|item| item.text())
             {
-                if let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) {
-                    let clean = text
-                        .replace("\r\n", " ")
-                        .replace('\n', " ")
-                        .replace('\r', " ");
-                    this.composer_input.push_str(&clean);
-                    cx.notify();
-                    return;
-                }
+                let clean = text.replace("\r\n", " ").replace(['\n', '\r'], " ");
+                this.composer_input.push_str(&clean);
+                cx.notify();
+                return;
             }
 
             // Clipboard copy (Ctrl+C / Cmd+C)
             if (event.keystroke.modifiers.control || event.keystroke.modifiers.platform)
                 && (key_name == "c" || key_name == "C")
+                && !this.composer_input.is_empty()
             {
-                if !this.composer_input.is_empty() {
-                    cx.write_to_clipboard(ClipboardItem::new_string(this.composer_input.clone()));
-                    return;
-                }
+                cx.write_to_clipboard(ClipboardItem::new_string(this.composer_input.clone()));
+                return;
             }
 
             // Clear line (Ctrl+U or Ctrl+Backspace)
@@ -326,11 +321,8 @@ impl CockpitApp {
             "tab" => {
                 let next = (this.snapshot.selected_tab + 1) % 4;
                 this.snapshot.selected_tab = next;
-                if next == 2 && this.is_orchestrator_pane(this.snapshot.swarm_selected_pane) {
-                    this.composer_focused = true;
-                } else {
-                    this.composer_focused = false;
-                }
+                this.composer_focused =
+                    next == 2 && this.is_orchestrator_pane(this.snapshot.swarm_selected_pane);
                 this.send_command(ClientCommand::SwitchTab { tab_index: next });
                 cx.notify();
             }

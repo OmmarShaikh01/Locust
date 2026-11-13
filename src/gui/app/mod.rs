@@ -81,10 +81,9 @@ impl CockpitApp {
                         for msg in &this.snapshot.controller_history {
                             if (msg.role == "operator" || msg.role == "user")
                                 && !msg.text.trim().is_empty()
+                                && this.history.last().map(|s| s.as_str()) != Some(&msg.text)
                             {
-                                if this.history.last().map(|s| s.as_str()) != Some(&msg.text) {
-                                    this.history.push(msg.text.clone());
-                                }
+                                this.history.push(msg.text.clone());
                             }
                         }
                         cx.notify();
@@ -137,19 +136,19 @@ impl CockpitApp {
 
             thread::spawn(move || {
                 while let Ok(cmd) = cmd_rx.recv() {
-                    if let Ok(bytes) = serde_json::to_vec(&cmd) {
-                        if write_frame(&mut write_stream, &bytes).is_err() {
-                            break;
-                        }
+                    if let Ok(bytes) = serde_json::to_vec(&cmd)
+                        && write_frame(&mut write_stream, &bytes).is_err()
+                    {
+                        break;
                     }
                 }
             });
 
             while let Ok(frame) = read_frame(&mut stream) {
-                if let Ok(event) = serde_json::from_slice::<ServerEvent>(&frame) {
-                    if event_tx.send(event).is_err() {
-                        break;
-                    }
+                if let Ok(event) = serde_json::from_slice::<ServerEvent>(&frame)
+                    && event_tx.send(event).is_err()
+                {
+                    break;
                 }
             }
         });

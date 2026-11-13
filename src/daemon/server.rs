@@ -148,10 +148,10 @@ impl DaemonServer {
 
             thread::spawn(move || {
                 while let Ok(event) = event_rx.recv() {
-                    if let Ok(bytes) = serde_json::to_vec(&event) {
-                        if write_frame(&mut write_stream, &bytes).is_err() {
-                            break;
-                        }
+                    if let Ok(bytes) = serde_json::to_vec(&event)
+                        && write_frame(&mut write_stream, &bytes).is_err()
+                    {
+                        break;
                     }
                 }
             });
@@ -159,10 +159,10 @@ impl DaemonServer {
             let cmd_tx = self.cmd_tx.clone();
             thread::spawn(move || {
                 while let Ok(bytes) = read_frame(&mut read_stream) {
-                    if let Ok(cmd) = serde_json::from_slice::<ClientCommand>(&bytes) {
-                        if cmd_tx.send(cmd).is_err() {
-                            break;
-                        }
+                    if let Ok(cmd) = serde_json::from_slice::<ClientCommand>(&bytes)
+                        && cmd_tx.send(cmd).is_err()
+                    {
+                        break;
                     }
                 }
                 logging::log(Level::Info, "Client command stream closed.");
@@ -173,14 +173,14 @@ impl DaemonServer {
     }
 
     fn broadcast_event(&mut self, event: ServerEvent) {
-        if let Some(tx) = &self.client_tx {
-            if tx.send(event).is_err() {
-                self.client_tx = None;
-                logging::log(
-                    Level::Info,
-                    "GUI client disconnected; continuing background execution.",
-                );
-            }
+        if let Some(tx) = &self.client_tx
+            && tx.send(event).is_err()
+        {
+            self.client_tx = None;
+            logging::log(
+                Level::Info,
+                "GUI client disconnected; continuing background execution.",
+            );
         }
     }
 

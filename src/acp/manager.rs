@@ -4,6 +4,9 @@ use crate::acp::client::{
 use std::collections::HashMap;
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 
+/// Outcome of a single agent turn: the final text reply plus usage, or an error message.
+type TurnResult = Result<(String, Option<UsageInfo>), String>;
+
 /// Where session ids get persisted across Locust restarts, so an agent's conversation can
 /// be resumed instead of starting fresh every launch. One flat JSON map from
 /// "{spec_id}::{key}" to the last session id seen for that identity.
@@ -99,7 +102,7 @@ enum Job {
     Turn {
         key: String,
         prompt: String,
-        reply_to: Sender<Result<(String, Option<UsageInfo>), String>>,
+        reply_to: Sender<TurnResult>,
         /// Live events while the turn runs (thinking, text, tools). Dropped when the turn
         /// ends, which is how the receiver knows no more events will come.
         progress_tx: Option<Sender<client::TurnEvent>>,
@@ -363,12 +366,7 @@ impl Manager {
     /// Ensure a connection exists for `spec` and send `prompt` as the next turn on the
     /// session identified by `key` (opening it first if needed). Backs both Swarm pane runs
     /// (keyed by pane name) and the Controller chat (keyed by `CONTROLLER_SESSION_KEY`).
-    pub fn turn(
-        &mut self,
-        spec: AgentSpec,
-        key: String,
-        prompt: String,
-    ) -> Receiver<Result<(String, Option<UsageInfo>), String>> {
+    pub fn turn(&mut self, spec: AgentSpec, key: String, prompt: String) -> Receiver<TurnResult> {
         self.turn_with_progress(spec, key, prompt, None)
     }
 
@@ -379,10 +377,7 @@ impl Manager {
         spec: AgentSpec,
         key: String,
         prompt: String,
-    ) -> (
-        Receiver<Result<(String, Option<UsageInfo>), String>>,
-        Receiver<client::TurnEvent>,
-    ) {
+    ) -> (Receiver<TurnResult>, Receiver<client::TurnEvent>) {
         let (ptx, prx) = mpsc::channel();
         let rx = self.turn_with_progress(spec, key, prompt, Some(ptx));
         (rx, prx)
@@ -394,7 +389,7 @@ impl Manager {
         key: String,
         prompt: String,
         progress_tx: Option<Sender<client::TurnEvent>>,
-    ) -> Receiver<Result<(String, Option<UsageInfo>), String>> {
+    ) -> Receiver<TurnResult> {
         self.ensure_connected(spec);
         let (tx, rx) = mpsc::channel();
         if let Some(actor) = self.actors.get(spec.id) {

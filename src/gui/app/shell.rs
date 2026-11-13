@@ -209,14 +209,10 @@ impl CockpitApp {
                                 MouseButton::Left,
                                 cx.listener(move |this, _, window, cx| {
                                     this.snapshot.selected_tab = idx;
-                                    if idx == 2
-                                        && this
-                                            .is_orchestrator_pane(this.snapshot.swarm_selected_pane)
-                                    {
-                                        this.composer_focused = true;
-                                    } else {
-                                        this.composer_focused = false;
-                                    }
+                                    this.composer_focused = idx == 2
+                                        && this.is_orchestrator_pane(
+                                            this.snapshot.swarm_selected_pane,
+                                        );
                                     window.focus(&this.focus_handle);
                                     this.send_command(ClientCommand::SwitchTab { tab_index: idx });
                                     cx.notify();
