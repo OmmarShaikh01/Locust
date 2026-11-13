@@ -33,6 +33,8 @@
 - Auto-Focus Typing: Pressing any printable key while the Orchestrator composer is blurred automatically claims focus and inserts the character without loss.
 - Modal Keyboard Intercept: Active permission prompts capture `Enter`/`y` for approval and `Esc`/`n` for denial before normal routing.
 - Clipboard and Editing Shortcuts: Supports `Ctrl+V`/`Cmd+V` clipboard paste, `Ctrl+C`/`Cmd+C` copy, `Ctrl+U`/`Ctrl+Backspace` line clearing, `Enter` submission, `Backspace` deletion, and `Esc` blurring.
+- History Navigation: Up and Down arrow keys in the focused Orchestrator composer navigate backwards and forwards through submitted prompt history, restoring any in-progress draft text when navigating back to the newest prompt. When composer is blurred, Up and Down scroll viewport offsets.
+- Controller Agent Resolution: Daemon dynamically resolves the active Orchestrator agent spec from configured swarm roster panes first, then falls back to `acp-claude` and `AGENT_SPECS.first()`. Spec lookup matches both short names (`claude`, `agy`, `opencode`, `codex`) and registered `acp-*` spec IDs.
 
 ## Swarm Interaction Model
 - Orchestrator-Only Human Interaction Spine: Only the Orchestrator (`Mission Orchestrator` / `Controller`) communicates with human operators. All sub-agents are strictly autonomous execution workers that print out their verbose reasoning stream (internal thoughts & decisions) and real-time execution state (phase, status, tokens, turns, runtime, output).

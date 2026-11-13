@@ -448,8 +448,11 @@ impl Manager {
 /// unrecognized agents rather than guessing a spec that would just fail to connect.
 pub fn spec_for_agent_id(agent: &str) -> Option<&'static AgentSpec> {
     let spec_id = match agent {
-        "claude" => "acp-claude",
-        "agy" | "antigravity" => "acp-antigravity",
+        "claude" | "acp-claude" => "acp-claude",
+        "agy" | "antigravity" | "acp-antigravity" => "acp-antigravity",
+        "opencode" | "acp-opencode" => "acp-opencode",
+        "codex" | "acp-codex" => "acp-codex",
+        id if AGENT_SPECS.iter().any(|s| s.id == id) => id,
         _ => return None,
     };
     AGENT_SPECS.iter().find(|s| s.id == spec_id)
@@ -462,10 +465,31 @@ mod tests {
     #[test]
     fn test_spec_for_agent_id_known_agents() {
         assert_eq!(spec_for_agent_id("claude").unwrap().id, "acp-claude");
+        assert_eq!(spec_for_agent_id("acp-claude").unwrap().id, "acp-claude");
         assert_eq!(spec_for_agent_id("agy").unwrap().id, "acp-antigravity");
         assert_eq!(
             spec_for_agent_id("antigravity").unwrap().id,
             "acp-antigravity"
+        );
+        assert_eq!(
+            spec_for_agent_id("acp-antigravity").unwrap().id,
+            "acp-antigravity"
+        );
+        assert_eq!(
+            spec_for_agent_id("opencode").unwrap().id,
+            "acp-opencode"
+        );
+        assert_eq!(
+            spec_for_agent_id("acp-opencode").unwrap().id,
+            "acp-opencode"
+        );
+        assert_eq!(
+            spec_for_agent_id("codex").unwrap().id,
+            "acp-codex"
+        );
+        assert_eq!(
+            spec_for_agent_id("acp-codex").unwrap().id,
+            "acp-codex"
         );
     }
 
