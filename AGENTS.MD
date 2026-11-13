@@ -47,8 +47,13 @@
 - Border Radiuses: `radius_none: 0px` for panels, cards, and grid cells; `radius_xs: 2px` for buttons, badges, and inputs; `radius_sm: 4px`; `radius_md: 6px`; `radius_lg: 8px`; `radius_xl: 12px`. Floating bento boxes are prohibited.
 - Grid Philosophy: Full-bleed mathematical grid divided by 1px hairline borders (`border_b_1`, `border_r_1`, `border_t_1`, `border_l_1`), 2px solid accent left indicators on active items, and high-contrast uppercase tracked section headers.
 
+## Swarm Configuration Rosters
+- Default Roster: `agents/full-software-factory/agents.yaml` (5 tabs, 21 agents across Claude and Antigravity models).
+- Test Swarm Roster: `agents/test-swarm/agents.yaml` and `agents/test-swarm.yaml` (5 tabs, 21 agents where all agents run on Claude 3.5 Haiku `claude-haiku-3-5` with `effort: low` to minimize token expenditure during testing).
+- Custom Roster Loading: Passing `--swarm-config <path>` to `locust` or `--server` loads an alternative YAML roster.
+
 ## Test Suite Status
-- Unit tests: 104 tests passing offline.
+- Unit tests: 105 tests passing offline.
 - Integration tests: 26 tests passing offline (tests/mock_acp.rs, 1 test ignored requiring agy CLI on PATH).
 - Execution command: cargo test.
 - Headless verification: cargo run -- --check, cargo run -- --usage.
