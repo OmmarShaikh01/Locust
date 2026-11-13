@@ -2,12 +2,12 @@ use crate::acp::{self, Manager, TurnEvent, UsageInfo};
 use crate::core::state::Model;
 use crate::ipc::framing::{read_frame, write_frame};
 use crate::ipc::protocol::{ClientCommand, ServerEvent};
-use crate::ipc::socket::{create_listener, pipe_name_for_project, Listener};
+use crate::ipc::socket::{Listener, create_listener, pipe_name_for_project};
 use crate::logging::{self, Level};
 use crate::project::Project;
 use crate::swarm::RunOutcome;
-use interprocess::local_socket::Stream as LocalStream;
 use interprocess::TryClone;
+use interprocess::local_socket::Stream as LocalStream;
 use std::io;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
@@ -148,10 +148,10 @@ impl DaemonServer {
 
             thread::spawn(move || {
                 while let Ok(event) = event_rx.recv() {
-                    if let Ok(bytes) = serde_json::to_vec(&event) {
-                        if write_frame(&mut write_stream, &bytes).is_err() {
-                            break;
-                        }
+                    if let Ok(bytes) = serde_json::to_vec(&event)
+                        && write_frame(&mut write_stream, &bytes).is_err()
+                    {
+                        break;
                     }
                 }
             });
@@ -159,10 +159,10 @@ impl DaemonServer {
             let cmd_tx = self.cmd_tx.clone();
             thread::spawn(move || {
                 while let Ok(bytes) = read_frame(&mut read_stream) {
-                    if let Ok(cmd) = serde_json::from_slice::<ClientCommand>(&bytes) {
-                        if cmd_tx.send(cmd).is_err() {
-                            break;
-                        }
+                    if let Ok(cmd) = serde_json::from_slice::<ClientCommand>(&bytes)
+                        && cmd_tx.send(cmd).is_err()
+                    {
+                        break;
                     }
                 }
                 logging::log(Level::Info, "Client command stream closed.");
@@ -173,14 +173,14 @@ impl DaemonServer {
     }
 
     fn broadcast_event(&mut self, event: ServerEvent) {
-        if let Some(tx) = &self.client_tx {
-            if tx.send(event).is_err() {
-                self.client_tx = None;
-                logging::log(
-                    Level::Info,
-                    "GUI client disconnected; continuing background execution.",
-                );
-            }
+        if let Some(tx) = &self.client_tx
+            && tx.send(event).is_err()
+        {
+            self.client_tx = None;
+            logging::log(
+                Level::Info,
+                "GUI client disconnected; continuing background execution.",
+            );
         }
     }
 
@@ -321,11 +321,9 @@ impl DaemonServer {
             self.controller_briefed = true;
         }
 
-        let rx = self.manager.turn(
-            *spec,
-            acp::CONTROLLER_SESSION_KEY.to_string(),
-            prompt,
-        );
+        let rx = self
+            .manager
+            .turn(*spec, acp::CONTROLLER_SESSION_KEY.to_string(), prompt);
         self.controller_turns.push(rx);
         self.broadcast_state_updated();
     }
@@ -563,7 +561,8 @@ mod tests {
 
     #[test]
     fn test_daemon_server_boots_and_syncs_over_ipc() {
-        let temp_dir = std::env::temp_dir().join(format!("locust_daemon_test_{}", std::process::id()));
+        let temp_dir =
+            std::env::temp_dir().join(format!("locust_daemon_test_{}", std::process::id()));
         let _ = std::fs::create_dir_all(&temp_dir);
         let project = Project::open(&temp_dir).unwrap();
 
@@ -575,7 +574,10 @@ mod tests {
             let frame = read_frame(&mut client).unwrap();
             let event: ServerEvent = serde_json::from_slice(&frame).unwrap();
             match event {
-                ServerEvent::InitialSync { state, server_version } => {
+                ServerEvent::InitialSync {
+                    state,
+                    server_version,
+                } => {
                     assert_eq!(server_version, "0.1.0");
                     assert_eq!(state.selected_tab, 0);
                 }

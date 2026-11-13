@@ -4,18 +4,43 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", content = "payload")]
 pub enum ClientCommand {
-    Hello { client_version: String },
-    SubmitControllerTurn { text: String },
-    DispatchTask { target_pane: String, prompt: String },
-    CancelTurn { pane_name: String },
-    RetryTurn { pane_name: String },
-    ResolvePermission { request_id: String, allowed: bool },
-    SwitchTab { tab_index: usize },
-    SelectPane { pane_index: usize },
-    SelectAcpServer { server_index: usize },
+    Hello {
+        client_version: String,
+    },
+    SubmitControllerTurn {
+        text: String,
+    },
+    DispatchTask {
+        target_pane: String,
+        prompt: String,
+    },
+    CancelTurn {
+        pane_name: String,
+    },
+    RetryTurn {
+        pane_name: String,
+    },
+    ResolvePermission {
+        request_id: String,
+        allowed: bool,
+    },
+    SwitchTab {
+        tab_index: usize,
+    },
+    SelectPane {
+        pane_index: usize,
+    },
+    SelectAcpServer {
+        server_index: usize,
+    },
     ToggleThinking,
-    SwitchProject { path: String },
-    QueryLogs { limit: usize, min_level: Option<String> },
+    SwitchProject {
+        path: String,
+    },
+    QueryLogs {
+        limit: usize,
+        min_level: Option<String>,
+    },
     Shutdown,
 }
 

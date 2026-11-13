@@ -361,10 +361,7 @@ agents:
 
     #[test]
     fn test_test_swarm_config_files_parse() {
-        for path in [
-            "agents/test-swarm/agents.yaml",
-            "agents/test-swarm.yaml",
-        ] {
+        for path in ["agents/test-swarm/agents.yaml", "agents/test-swarm.yaml"] {
             let config = SwarmConfig::load(Path::new(path))
                 .unwrap_or_else(|_| panic!("{path} should parse"));
             assert_eq!(config.tabs.len(), 5);
